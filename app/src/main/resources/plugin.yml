@@ -1,7 +1,7 @@
 name: Dams's Vanilla+
 version: ${version}
 main: me.st4r.myplugin.DVPlus
-description: Adds new vanilla-inspired mechanics to Minecraft
+description: Adds new vanilla-inspired mechanics to Minecraft.
 authors: [st4r]
 
 commands:

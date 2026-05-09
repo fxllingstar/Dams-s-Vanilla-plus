@@ -26,7 +26,8 @@ public final class DVPlus extends JavaPlugin implements Listener {
         MessengerParrotListener parrotListener = new MessengerParrotListener(this);
         getServer().getPluginManager().registerEvents(parrotListener, this);
         getCommand("parrot").setExecutor(parrotListener);
-
+        getServer().getPluginManager().registerEvent(new LuminousItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new SmithingTableListener(), this);
         getServer().getPluginManager().registerEvents(new HitchMechanicListener(this), this);
         getServer().getPluginManager().registerEvents(new LunarHarvestingListener(), this);
         getLogger().info("----------------------------------");
@@ -34,7 +35,7 @@ public final class DVPlus extends JavaPlugin implements Listener {
         getLogger().info("'To become a star, you must burn.'");
         getLogger().info("----------------------------------");
         
-
+         new LightEmissionTask(this).runTaskTimer(this, 0L, 1L);
         startCauldronFrostTasks();
     }
 
