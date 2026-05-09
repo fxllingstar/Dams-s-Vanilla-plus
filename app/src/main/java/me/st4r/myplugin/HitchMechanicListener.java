@@ -59,7 +59,6 @@ public class HitchMechanicListener implements Listener {
             startDragTask(horse, nearby);
         }
 
-        // Right-clicking the boat/minecart while holding a lead — unhitch
         if (clicked instanceof Boat || clicked instanceof Minecart) {
             for (Map.Entry<UUID, UUID> entry : hitchedVehicle.entrySet()) {
                 if (entry.getValue().equals(clicked.getUniqueId())) {

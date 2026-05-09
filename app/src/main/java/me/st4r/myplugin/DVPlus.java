@@ -16,8 +16,11 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.inventory.meta.Damageable;
 
 import java.util.Arrays;
+import org.bukkit.NamespacedKey;
 
 public final class DVPlus extends JavaPlugin implements Listener {
+
+    public static final NamespacedKey LUMINOUS_KEY = new NamespacedKey("dvplus", "luminous_time");
 
     @Override
     public void onEnable() {
@@ -26,7 +29,8 @@ public final class DVPlus extends JavaPlugin implements Listener {
         MessengerParrotListener parrotListener = new MessengerParrotListener(this);
         getServer().getPluginManager().registerEvents(parrotListener, this);
         getCommand("parrot").setExecutor(parrotListener);
-
+        getServer().getPluginManager().registerEvents(new LuminousItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new SmithingTableListener(), this);
         getServer().getPluginManager().registerEvents(new HitchMechanicListener(this), this);
         getServer().getPluginManager().registerEvents(new LunarHarvestingListener(), this);
         getLogger().info("----------------------------------");
@@ -34,7 +38,7 @@ public final class DVPlus extends JavaPlugin implements Listener {
         getLogger().info("'To become a star, you must burn.'");
         getLogger().info("----------------------------------");
         
-
+         new LightEmissionTask(this).runTaskTimer(this, 0L, 1L);
         startCauldronFrostTasks();
     }
 
@@ -42,17 +46,25 @@ public final class DVPlus extends JavaPlugin implements Listener {
     // Rotten Flesh purification on campfire (2 minutes)
     // -----------------------------------------------------------------
     @EventHandler
-    public void onBlockPlace(BlockPlaceEvent event) {
-        if (event.getBlock().getType() != Material.ROTTEN_FLESH) return;
-        Block below = event.getBlock().getRelative(BlockFace.DOWN);
-        if (below.getType() != Material.CAMPFIRE && below.getType() != Material.SOUL_CAMPFIRE) return;
+    public void onCampfireInteract(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (event.getClickedBlock() == null) return;
+        if (event.getClickedBlock().getType() != Material.CAMPFIRE &&
+            event.getClickedBlock().getType() != Material.SOUL_CAMPFIRE) return;
 
-        Block flesh = event.getBlock();
+        ItemStack item = event.getItem();
+        if (item == null || item.getType() != Material.ROTTEN_FLESH) return;
+
+        event.setCancelled(true);
+        Block campfire = event.getClickedBlock();
+        ItemStack flesh = item.clone();
+        flesh.setAmount(1);
+
+        item.setAmount(item.getAmount() - 1);
+
         Bukkit.getScheduler().scheduleSyncDelayedTask(this, () -> {
-            if (flesh.getType() == Material.ROTTEN_FLESH) {
-                flesh.setType(Material.LEATHER);
-            }
-        }, 2400L);
+            campfire.getWorld().dropItemNaturally(campfire.getLocation().add(0.5, 1, 0.5), new ItemStack(Material.LEATHER));
+        }, 2400L); // 2 minutes
     }
 
     // -----------------------------------------------------------------
@@ -64,7 +76,7 @@ public final class DVPlus extends JavaPlugin implements Listener {
         if (event.getClickedBlock() == null) return;
         if (event.getClickedBlock().getType() != Material.STONECUTTER) return;
         handleStonecutterSharpening(event);
-    }
+    }                 
 
     private void handleStonecutterSharpening(PlayerInteractEvent event) {
         ItemStack item = event.getItem();
@@ -78,8 +90,13 @@ public final class DVPlus extends JavaPlugin implements Listener {
             damageable.setDamage(damage + 10);
             item.setItemMeta(damageable);
 
-            event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.HASTE,    12000, 0, true, false));
-            event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 12000, 0, true, false));
+            String toolType = item.getType().toString();
+            if (toolType.endsWith("_PICKAXE")) {
+                event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.HASTE, 12000, 0, true, false));
+            } else if (toolType.endsWith("_SWORD")) {
+                event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 12000, 0, true, false));
+            }
+
             event.getPlayer().sendMessage("§aYour tool has been sharpened!");
             event.setCancelled(true);
         } else {
