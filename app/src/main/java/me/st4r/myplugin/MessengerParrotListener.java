@@ -142,6 +142,7 @@ public class MessengerParrotListener implements Listener, CommandExecutor {
 
     private void launchParrotToTarget(Parrot parrot, Player target) {
         UUID parrotId = parrot.getUniqueId();
+        target.sendMessage("§6A messenger parrot is on its way to you!");
 
         BukkitTask task = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             // Parrot or target may have logged off / died
@@ -157,7 +158,6 @@ public class MessengerParrotListener implements Listener, CommandExecutor {
                 return;
             }
 
-            // Move toward target at 2x normal parrot speed
             Location parrotLoc = p.getLocation();
             Location targetLoc = dest.getLocation().add(0, 1.5, 0);
 
@@ -166,14 +166,20 @@ public class MessengerParrotListener implements Listener, CommandExecutor {
             double distance = parrotLoc.distance(targetLoc);
 
             if (distance <= 1.5) {
-                // Arrived — deliver the item
                 deliverToTarget(p, dest);
                 return;
             }
 
-            Vector direction = targetLoc.toVector().subtract(parrotLoc.toVector()).normalize().multiply(0.6);
-            p.setVelocity(direction);
-            p.teleport(parrotLoc.setDirection(direction));
+            if (distance <= 10) {
+                // Close range: teleport a few meters toward target
+                Vector direction = targetLoc.toVector().subtract(parrotLoc.toVector()).normalize().multiply(3);
+                p.teleport(parrotLoc.add(direction));
+            } else {
+                // Far range: use velocity for smooth movement
+                Vector direction = targetLoc.toVector().subtract(parrotLoc.toVector()).normalize().multiply(0.6);
+                p.setVelocity(direction);
+                p.teleport(parrotLoc.setDirection(direction));
+            }
 
         }, 0L, 2L); // Every 2 ticks (~10 times/sec)
 
@@ -234,7 +240,7 @@ public class MessengerParrotListener implements Listener, CommandExecutor {
         // Mark parrot as waiting for reply — give recipient 2 minutes
         // (If they want to reply, they use /parrot reply — future enhancement)
         // For now, parrot returns to owner after delivery
-        returnParrotToOwner(parrot);
+      
     }
 
     private void returnParrotToOwner(Parrot parrot) {

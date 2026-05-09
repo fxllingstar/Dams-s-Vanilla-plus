@@ -30,10 +30,11 @@ public class SmithingTableListener implements Listener{
         ItemStack template = inv.getItem(0);   // Template slot
         ItemStack base = inv.getItem(1);       // Base item (tool/armor)
         ItemStack addition = inv.getItem(2);   // Addition (glow ink sac)
-        
+
 
     if (base == null || addition == null) return;
     if (addition.getType() != Material.GLOW_INK_SAC) return;
+    if (template == null || template.getType() != Material.GLOW_ITEM_FRAME) return;
     if (!isValidLuminousItem(base.getType())) return;
    
     ItemStack result = base.clone();
@@ -59,16 +60,18 @@ public class SmithingTableListener implements Listener{
   }
 
   private boolean isValidLuminousItem(Material type){
+    String name = type.toString();
     return
-    type.toString().endsWith("_HELMET") ||
-    type.toString().endsWith("_CHESTPLATE") ||
-    type.toString().endsWith("_LEGGINGS") ||
-    type.toString().endsWith("_BOOTS") || 
-    type.toString().endsWith("_SWORD")|| 
-    type.toString().endsWith("_PICKAXE") ||
-    type.toString().endsWith("_AXE")||
-    type.toString().endsWith("_SHOVEL")||
-    type.toString().endsWith("_HOE");
+    name.endsWith("_HELMET") ||
+    name.endsWith("_CHESTPLATE") ||
+    name.endsWith("_LEGGINGS") ||
+    name.endsWith("_BOOTS") ||
+    name.endsWith("_SWORD") ||
+    name.endsWith("_PICKAXE") ||
+    name.endsWith("_AXE") ||
+    name.endsWith("_SHOVEL") ||
+    name.endsWith("_HOE") ||
+    name.equals("NETHERITE_SWORD");
   }
 
 }
