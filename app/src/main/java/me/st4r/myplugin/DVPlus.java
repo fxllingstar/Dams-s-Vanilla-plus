@@ -16,8 +16,12 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.inventory.meta.Damageable;
 
 import java.util.Arrays;
+import org.bukkit.NamespacedKey;
+import org.bukkit.persistence.PersistentDataType;
 
 public final class DVPlus extends JavaPlugin implements Listener {
+
+    public static final NamespacedKey LUMINOUS_KEY = new NamespacedKey("dvplus", "luminous_time");
 
     @Override
     public void onEnable() {
@@ -26,7 +30,7 @@ public final class DVPlus extends JavaPlugin implements Listener {
         MessengerParrotListener parrotListener = new MessengerParrotListener(this);
         getServer().getPluginManager().registerEvents(parrotListener, this);
         getCommand("parrot").setExecutor(parrotListener);
-        getServer().getPluginManager().registerEvent(new LuminousItemListener(this), this);
+        getServer().getPluginManager().registerEvents(new LuminousItemListener(this), this);
         getServer().getPluginManager().registerEvents(new SmithingTableListener(), this);
         getServer().getPluginManager().registerEvents(new HitchMechanicListener(this), this);
         getServer().getPluginManager().registerEvents(new LunarHarvestingListener(), this);

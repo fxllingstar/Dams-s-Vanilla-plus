@@ -27,8 +27,10 @@ public class SmithingTableListener implements Listener{
 
     SmithingInventory inv = event.getInventory();
 
-    ItemStack base = inv.getItem(0); //tools and armor
-    ItemStack addition = inv.getItem(1);
+        ItemStack template = inv.getItem(0);   // Template slot
+        ItemStack base = inv.getItem(1);       // Base item (tool/armor)
+        ItemStack addition = inv.getItem(2);   // Addition (glow ink sac)
+        
 
     if (base == null || addition == null) return;
     if (addition.getType() != Material.GLOW_INK_SAC) return;
