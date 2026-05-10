@@ -10,6 +10,8 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.RecipeChoice;
+import org.bukkit.inventory.SmithingTransformRecipe;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -29,17 +31,19 @@ public final class DVPlus extends JavaPlugin implements Listener {
         MessengerParrotListener parrotListener = new MessengerParrotListener(this);
         getServer().getPluginManager().registerEvents(parrotListener, this);
         getCommand("parrot").setExecutor(parrotListener);
-        getServer().getPluginManager().registerEvents(new LuminousItemListener(this), this);
         getServer().getPluginManager().registerEvents(new SmithingTableListener(), this);
         getServer().getPluginManager().registerEvents(new HitchMechanicListener(this), this);
         getServer().getPluginManager().registerEvents(new LunarHarvestingListener(), this);
+      
         getLogger().info("----------------------------------");
         getLogger().info("Dams's Vanilla+ Enabled.");
         getLogger().info("'To become a star, you must burn.'");
         getLogger().info("----------------------------------");
         
          new LightEmissionTask(this).runTaskTimer(this, 0L, 1L);
-        startCauldronFrostTasks();
+         new LuminousDecayTask().runTaskTimer(this, 20L, 20L); 
+        startCauldronFrostTasks();  
+        registerLuminousRecipes();
     }
 
     // -----------------------------------------------------------------
@@ -66,6 +70,44 @@ public final class DVPlus extends JavaPlugin implements Listener {
             campfire.getWorld().dropItemNaturally(campfire.getLocation().add(0.5, 1, 0.5), new ItemStack(Material.LEATHER));
         }, 2400L); // 2 minutes
     }
+
+
+
+  //-------------------------------------------------------------------
+  //Luminous Item Registration
+  //-------------------------------------------------------------------
+  private void registerLuminousRecipes() {
+    // We loop through all materials to find things like DIAMOND_SWORD, etc.
+    for (Material mat : Material.values()) {
+        String name = mat.toString();
+        if (name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE") || 
+            name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS") || 
+            name.endsWith("_SWORD") || name.endsWith("_PICKAXE") || 
+            name.endsWith("_AXE") || name.endsWith("_SHOVEL") || name.endsWith("_HOE")) {
+
+            NamespacedKey key = new NamespacedKey(this, "luminous_" + name.toLowerCase());
+            
+    
+            SmithingTransformRecipe recipe = new SmithingTransformRecipe(
+                key,
+                new ItemStack(mat), 
+                new RecipeChoice.MaterialChoice(Material.GLOW_ITEM_FRAME), 
+                new RecipeChoice.MaterialChoice(mat), // The Base tool
+                new RecipeChoice.MaterialChoice(Material.GLOW_INK_SAC) // The Addition
+            );
+
+            Bukkit.addRecipe(recipe);
+        }
+    }
+}
+
+
+
+
+
+
+
+
 
     // -----------------------------------------------------------------
     // Stonecutter tool sharpening

@@ -18,14 +18,10 @@ public class SmithingTableListener implements Listener {
 
     private static final int MAX_LUMINOUS_TIME = 12000;
 
-    // Slot layout in 1.20+: 0 = template, 1 = base, 2 = addition
-    // We don't require a template — slot 0 can be anything or empty.
     @EventHandler
     public void onPrepareSmithing(PrepareSmithingEvent event) {
         SmithingInventory inv = event.getInventory();
 
-        // Try both legacy (slot 0 = base, slot 1 = addition) and
-        // modern (slot 0 = template, slot 1 = base, slot 2 = addition) layouts.
         ItemStack base = null;
         ItemStack addition = null;
 
