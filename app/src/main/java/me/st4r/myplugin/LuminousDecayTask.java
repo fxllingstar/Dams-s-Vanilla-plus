@@ -11,54 +11,47 @@ public class LuminousDecayTask extends BukkitRunnable {
 
     @Override
     public void run() {
+        long now = System.currentTimeMillis();
+
         for (Player player : Bukkit.getOnlinePlayers()) {
-            // Check and decay Main Hand
-            checkAndDecay(player, player.getInventory().getItemInMainHand());
-            
-            // Check and decay Off-Hand
-            checkAndDecay(player, player.getInventory().getItemInOffHand());
-            
-            // Check and decay Armor
+       
+            checkAndCleanup(player, player.getInventory().getItemInMainHand(), now);
+            checkAndCleanup(player, player.getInventory().getItemInOffHand(), now);
             for (ItemStack armor : player.getInventory().getArmorContents()) {
-                checkAndDecay(player, armor);
+                checkAndCleanup(player, armor, now);
             }
         }
     }
 
-    private void checkAndDecay(Player player, ItemStack item) {
+    private void checkAndCleanup(Player player, ItemStack item, long now) {
         if (item == null || !item.hasItemMeta()) return;
         
         var meta = item.getItemMeta();
         var pdc = meta.getPersistentDataContainer();
         
-        if (!pdc.has(DVPlus.LUMINOUS_KEY, PersistentDataType.INTEGER)) return;
+ 
+        if (!pdc.has(DVPlus.LUMINOUS_KEY, PersistentDataType.LONG)) return;
 
-        int remaining = pdc.get(DVPlus.LUMINOUS_KEY, PersistentDataType.INTEGER);
-        
-        if (remaining <= 0) {
+        long expiry = pdc.get(DVPlus.LUMINOUS_KEY, PersistentDataType.LONG);
+        long timeLeftMillis = expiry - now;
+
+        if (timeLeftMillis <= 0) {
             pdc.remove(DVPlus.LUMINOUS_KEY);
-            
             if (meta.hasLore()) {
                 var lore = meta.getLore();
                 lore.removeIf(line -> line.contains("Luminous"));
                 meta.setLore(lore);
             }
-            
             item.setItemMeta(meta);
-            player.sendMessage(ChatColor.GRAY + "A luminous glow has faded from your equipment...");
+            player.sendMessage(ChatColor.GRAY + "Your equipment's glow has faded.");
             return;
         }
-        
-    
-        int newRemaining = remaining - 20;
-        pdc.set(DVPlus.LUMINOUS_KEY, PersistentDataType.INTEGER, newRemaining);
-        
-        // Notify player every 5 minutes (6000 ticks)
-        if (newRemaining > 0 && newRemaining % 6000 == 0) {
-            int minutesLeft = newRemaining / 1200;
-            player.sendMessage(ChatColor.AQUA + "✦ " + minutesLeft + " minutes of luminosity left on your equipment...");
+
+        long secondsLeft = timeLeftMillis / 1000;
+        if (secondsLeft > 0 && secondsLeft % 300 == 0) { // 300 seconds = 5 minutes
+            player.sendMessage(ChatColor.AQUA + "✦ Your equipment has " + (secondsLeft / 60) + " minutes of light remaining.");
         }
         
-        item.setItemMeta(meta);
+
     }
 }
