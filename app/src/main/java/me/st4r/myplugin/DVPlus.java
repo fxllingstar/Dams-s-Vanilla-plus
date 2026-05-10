@@ -77,7 +77,7 @@ public final class DVPlus extends JavaPlugin implements Listener {
   //Luminous Item Registration
   //-------------------------------------------------------------------
   private void registerLuminousRecipes() {
-    // We loop through all materials to find things like DIAMOND_SWORD, etc.
+ 
     for (Material mat : Material.values()) {
         String name = mat.toString();
         if (name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE") || 

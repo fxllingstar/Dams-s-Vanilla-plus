@@ -40,8 +40,9 @@ public class SmithingTableListener implements Listener {
         ItemStack result = base.clone();
         var meta = result.getItemMeta();
         if (meta == null) return;
-
-        meta.getPersistentDataContainer().set(DVPlus.LUMINOUS_KEY, PersistentDataType.INTEGER, MAX_LUMINOUS_TIME);
+// Inside your PrepareSmithingEvent logic
+long expiryTime = System.currentTimeMillis() + (MAX_LUMINOUS_TIME * 50L); // 12000 ticks * 50ms = 10 mins
+meta.getPersistentDataContainer().set(DVPlus.LUMINOUS_KEY, PersistentDataType.LONG, expiryTime);
 
         List<Component> lore = meta.hasLore() ? new ArrayList<>(meta.lore()) : new ArrayList<>();
         lore.removeIf(line -> PlainTextComponentSerializer.plainText().serialize(line).contains("Luminous"));

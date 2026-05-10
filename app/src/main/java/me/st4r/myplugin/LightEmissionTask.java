@@ -37,7 +37,7 @@ public class LightEmissionTask extends BukkitRunnable {
                     
                     Block currentBlock = currentLoc.getBlock();
                     if (currentBlock.isPassable() && !currentBlock.isLiquid()) {
-                        player.sendBlockChange(currentLoc, Bukkit.createBlockData("minecraft:light[level=9]"));
+                        player.sendBlockChange(currentLoc, Bukkit.createBlockData("minecraft:light[level=13]"));
                         lastLightLocations.put(uuid, currentLoc);
                     } else {
                         lastLightLocations.remove(uuid);
@@ -69,6 +69,6 @@ public class LightEmissionTask extends BukkitRunnable {
     
     private boolean isLuminous(ItemStack item) {
         if (item == null || !item.hasItemMeta()) return false;
-        return item.getItemMeta().getPersistentDataContainer().has(DVPlus.LUMINOUS_KEY, PersistentDataType.INTEGER);
+        return item.getItemMeta().getPersistentDataContainer().has(DVPlus.LUMINOUS_KEY, PersistentDataType.LONG);
     }
 }
