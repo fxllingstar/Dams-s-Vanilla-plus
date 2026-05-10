@@ -1,77 +1,71 @@
 package me.st4r.myplugin;
 
-
-
 import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.PrepareSmithingEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.SmithingInventory;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.ChatColor;
-
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class SmithingTableListener implements Listener{
+public class SmithingTableListener implements Listener {
 
-  private static final NamespacedKey LUMINOUS_KEY = new NamespacedKey(DVPlus.getPlugin(DVPlus.class), "luminous_time");
-  private static final int MAX_LUMINOUS_TIME = 12000;
+    private static final int MAX_LUMINOUS_TIME = 12000;
 
+    // Slot layout in 1.20+: 0 = template, 1 = base, 2 = addition
+    // We don't require a template — slot 0 can be anything or empty.
+    @EventHandler
+    public void onPrepareSmithing(PrepareSmithingEvent event) {
+        SmithingInventory inv = event.getInventory();
 
-  @EventHandler
-  public void onSmithing(PrepareSmithingEvent event){
+        // Try both legacy (slot 0 = base, slot 1 = addition) and
+        // modern (slot 0 = template, slot 1 = base, slot 2 = addition) layouts.
+        ItemStack base = null;
+        ItemStack addition = null;
 
-    SmithingInventory inv = event.getInventory();
+        for (int size = inv.getSize(), i = 0; i < size; i++) {
+            ItemStack slot = inv.getItem(i);
+            if (slot == null) continue;
+            if (slot.getType() == Material.GLOW_INK_SAC) {
+                addition = slot;
+            } else if (isValidLuminousItem(slot.getType())) {
+                base = slot;
+            }
+        }
 
-        ItemStack template = inv.getItem(0);   // Template slot
-        ItemStack base = inv.getItem(1);       // Base item (tool/armor)
-        ItemStack addition = inv.getItem(2);   // Addition (glow ink sac)
+        if (base == null || addition == null) return;
 
+        ItemStack result = base.clone();
+        var meta = result.getItemMeta();
+        if (meta == null) return;
 
-    if (base == null || addition == null) return;
-    if (addition.getType() != Material.GLOW_INK_SAC) return;
-    if (template == null || template.getType() != Material.GLOW_ITEM_FRAME) return;
-    if (!isValidLuminousItem(base.getType())) return;
-   
-    ItemStack result = base.clone();
-    var meta = result.getItemMeta();
-    if (meta == null) return;
+        meta.getPersistentDataContainer().set(DVPlus.LUMINOUS_KEY, PersistentDataType.INTEGER, MAX_LUMINOUS_TIME);
 
-    meta.getPersistentDataContainer().set(LUMINOUS_KEY, PersistentDataType.INTEGER, MAX_LUMINOUS_TIME);
+        List<Component> lore = meta.hasLore() ? new ArrayList<>(meta.lore()) : new ArrayList<>();
+        lore.removeIf(line -> PlainTextComponentSerializer.plainText().serialize(line).contains("Luminous"));
+        lore.add(Component.text("✦ Luminous", NamedTextColor.AQUA));
+        meta.lore(lore);
+        result.setItemMeta(meta);
 
-    List<String> lore = meta.hasLore()
-        ? new ArrayList<>(meta.getLore())
-        : new ArrayList<>();
+        event.setResult(result);
+    }
 
-    lore.removeIf(line -> line.contains("Luminous"));
-
-    lore.add(ChatColor.AQUA + "✦ Luminous");
-
-    meta.setLore(lore);
-    result.setItemMeta(meta);
-    
-
-    event.setResult(result);
-
-  }
-
-  private boolean isValidLuminousItem(Material type){
-    String name = type.toString();
-    return
-    name.endsWith("_HELMET") ||
-    name.endsWith("_CHESTPLATE") ||
-    name.endsWith("_LEGGINGS") ||
-    name.endsWith("_BOOTS") ||
-    name.endsWith("_SWORD") ||
-    name.endsWith("_PICKAXE") ||
-    name.endsWith("_AXE") ||
-    name.endsWith("_SHOVEL") ||
-    name.endsWith("_HOE") ||
-    name.equals("NETHERITE_SWORD");
-  }
-
+    private boolean isValidLuminousItem(Material type) {
+        String name = type.toString();
+        return name.endsWith("_HELMET")
+            || name.endsWith("_CHESTPLATE")
+            || name.endsWith("_LEGGINGS")
+            || name.endsWith("_BOOTS")
+            || name.endsWith("_SWORD")
+            || name.endsWith("_PICKAXE")
+            || name.endsWith("_AXE")
+            || name.endsWith("_SHOVEL")
+            || name.endsWith("_HOE");
+    }
 }
