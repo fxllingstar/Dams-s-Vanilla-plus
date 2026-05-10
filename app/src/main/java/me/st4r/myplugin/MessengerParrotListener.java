@@ -170,15 +170,15 @@ public class MessengerParrotListener implements Listener, CommandExecutor {
                 return;
             }
 
-            if (distance <= 10) {
-                // Close range: teleport a few meters toward target
-                Vector direction = targetLoc.toVector().subtract(parrotLoc.toVector()).normalize().multiply(3);
-                p.teleport(parrotLoc.add(direction));
+            if (distance <= 8) {
+                // Close range: teleport directly to just behind the target to avoid overshooting
+                p.teleport(targetLoc);
             } else {
-                // Far range: use velocity for smooth movement
-                Vector direction = targetLoc.toVector().subtract(parrotLoc.toVector()).normalize().multiply(0.6);
-                p.setVelocity(direction);
-                p.teleport(parrotLoc.setDirection(direction));
+                // Far range: step 3 blocks toward target each tick
+                Vector direction = targetLoc.toVector().subtract(parrotLoc.toVector()).normalize().multiply(3);
+                Location next = parrotLoc.clone().add(direction);
+                next.setDirection(direction);
+                p.teleport(next);
             }
 
         }, 0L, 2L); // Every 2 ticks (~10 times/sec)
@@ -275,14 +275,21 @@ public class MessengerParrotListener implements Listener, CommandExecutor {
 
             if (parrotLoc.getWorld() != ownerLoc.getWorld()) return;
 
-            if (parrotLoc.distance(ownerLoc) <= 1.5) {
+            double returnDist = parrotLoc.distance(ownerLoc);
+            if (returnDist <= 1.5) {
                 o.sendMessage("§aYour parrot has returned!");
                 cleanup(parrotId, false);
                 return;
             }
 
-            Vector direction = ownerLoc.toVector().subtract(parrotLoc.toVector()).normalize().multiply(0.6);
-            p.setVelocity(direction);
+            if (returnDist <= 8) {
+                p.teleport(ownerLoc);
+            } else {
+                Vector direction = ownerLoc.toVector().subtract(parrotLoc.toVector()).normalize().multiply(3);
+                Location next = parrotLoc.clone().add(direction);
+                next.setDirection(direction);
+                p.teleport(next);
+            }
 
         }, 0L, 2L);
 
