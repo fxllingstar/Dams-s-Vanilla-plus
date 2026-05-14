@@ -63,28 +63,28 @@ public final class DVPlus extends JavaPlugin implements Listener {
     // -----------------------------------------------------------------
     // Rotten Flesh purification on campfire (2 minutes)
     // -----------------------------------------------------------------
-    @EventHandler
-    public void onCampfireInteract(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        if (event.getClickedBlock() == null) return;
-        if (event.getClickedBlock().getType() != Material.CAMPFIRE &&
-            event.getClickedBlock().getType() != Material.SOUL_CAMPFIRE) return;
+  @EventHandler
+public void onCampfireInteract(PlayerInteractEvent event) {
+    if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+    if (event.getClickedBlock() == null) return;
+    if (event.getClickedBlock().getType() != Material.CAMPFIRE &&
+        event.getClickedBlock().getType() != Material.SOUL_CAMPFIRE) return;
 
-        ItemStack item = event.getItem();
-        if (item == null || item.getType() != Material.ROTTEN_FLESH) return;
+    ItemStack item = event.getItem();
+    if (item == null || item.getType() != Material.ROTTEN_FLESH) return;
 
-        event.setCancelled(true);
-        Block campfire = event.getClickedBlock();
-        ItemStack flesh = item.clone();
-        flesh.setAmount(1);
+    event.setCancelled(true);
+    Block campfire = event.getClickedBlock();
+    item.setAmount(item.getAmount() - 1);
+    
+    event.getPlayer().sendMessage("§eThe rotten flesh is beginning to cook; it will be turned into leather in 2 minutes.");
 
-        item.setAmount(item.getAmount() - 1);
-
-        Bukkit.getScheduler().scheduleSyncDelayedTask(this, () -> {
+    Bukkit.getScheduler().scheduleSyncDelayedTask(this, () -> {
+        if (campfire.getWorld() != null) {
             campfire.getWorld().dropItemNaturally(campfire.getLocation().add(0.5, 1, 0.5), new ItemStack(Material.LEATHER));
-        }, 2400L); // 2 minutes
-    }
-
+        }
+    }, 2400L); // 2400 ticks = 120 seconds = 2 minutes
+}
 
 
   //-------------------------------------------------------------------
