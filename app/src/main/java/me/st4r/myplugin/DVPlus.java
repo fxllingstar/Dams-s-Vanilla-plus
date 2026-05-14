@@ -32,12 +32,19 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.inventory.meta.Damageable;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import org.bukkit.Location;
+
+
 import org.bukkit.NamespacedKey;
 
 public final class DVPlus extends JavaPlugin implements Listener {
 
     public static final NamespacedKey LUMINOUS_KEY = new NamespacedKey("dvplus", "luminous_time");
 
+
+    
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
@@ -63,27 +70,45 @@ public final class DVPlus extends JavaPlugin implements Listener {
     // -----------------------------------------------------------------
     // Rotten Flesh purification on campfire (2 minutes)
     // -----------------------------------------------------------------
-  @EventHandler
+ private final Map<Location, Integer> campfireCrops = new HashMap<>();
+
+@EventHandler
 public void onCampfireInteract(PlayerInteractEvent event) {
     if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
     if (event.getClickedBlock() == null) return;
-    if (event.getClickedBlock().getType() != Material.CAMPFIRE &&
-        event.getClickedBlock().getType() != Material.SOUL_CAMPFIRE) return;
+    
+    Block campfire = event.getClickedBlock();
+    if (campfire.getType() != Material.CAMPFIRE &&
+        campfire.getType() != Material.SOUL_CAMPFIRE) return;
 
     ItemStack item = event.getItem();
     if (item == null || item.getType() != Material.ROTTEN_FLESH) return;
+    Location loc = campfire.getLocation();
+    int currentCount = campfireCrops.getOrDefault(loc, 0);
+
+    if (currentCount >= 5) {
+        event.getPlayer().sendMessage("§cCampfire is full, use another one");
+        return;
+    }
+
 
     event.setCancelled(true);
-    Block campfire = event.getClickedBlock();
     item.setAmount(item.getAmount() - 1);
-    
-    event.getPlayer().sendMessage("§eThe rotten flesh is beginning to cook; it will be turned into leather in 2 minutes.");
+    campfireCrops.put(loc, currentCount + 1);
 
+    event.getPlayer().sendMessage("§eThe rotten flesh is beginning to cook; it will be turned into leather in 2 minutes.");
     Bukkit.getScheduler().scheduleSyncDelayedTask(this, () -> {
         if (campfire.getWorld() != null) {
-            campfire.getWorld().dropItemNaturally(campfire.getLocation().add(0.5, 1, 0.5), new ItemStack(Material.LEATHER));
+            campfire.getWorld().dropItemNaturally(loc.clone().add(0.5, 1, 0.5), new ItemStack(Material.LEATHER));
         }
-    }, 2400L); // 2400 ticks = 120 seconds = 2 minutes
+
+        int newCount = campfireCrops.getOrDefault(loc, 0) - 1;
+        if (newCount <= 0) {
+            campfireCrops.remove(loc);
+        } else {
+            campfireCrops.put(loc, newCount);
+        }
+    }, 2400L); 
 }
 
 
