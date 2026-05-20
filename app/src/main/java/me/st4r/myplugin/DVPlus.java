@@ -1,13 +1,25 @@
+/*
+ * DVPlus (Dams's Vanilla +)
+ * Copyright (C) 2026 fxllingstar
+ *
+ * Licensed under the GNU Affero General Public License v3.0.
+ * If you run a modified version of this software as a service, 
+ * you must provide access to the source code of your modifications.
+ *
+ * Read the License file here: 
+ * https://github.com/fxllingstar/Dams-s-Vanilla-plus/blob/main/LICENSE
+ */
+
+
+
 package me.st4r.myplugin;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
-import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
@@ -18,12 +30,19 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.inventory.meta.Damageable;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import org.bukkit.Location;
+
+
 import org.bukkit.NamespacedKey;
 
 public final class DVPlus extends JavaPlugin implements Listener {
 
     public static final NamespacedKey LUMINOUS_KEY = new NamespacedKey("dvplus", "luminous_time");
 
+
+    
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
@@ -36,7 +55,7 @@ public final class DVPlus extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new LunarHarvestingListener(), this);
       
         getLogger().info("----------------------------------");
-        getLogger().info("Dams's Vanilla+ Enabled.");
+        getLogger().info("Dams's Vanilla + Enabled.");
         getLogger().info("'To become a star, you must burn.'");
         getLogger().info("----------------------------------");
         
@@ -46,31 +65,57 @@ public final class DVPlus extends JavaPlugin implements Listener {
         registerLuminousRecipes();
     }
 
+
+    //======================================================
+   //    HASHMAPS
+   //=======================================================
+ private final Map<Location, Integer> campfireCrops = new HashMap<>();
+ private final java.util.Set<Location> trackedCauldrons = new java.util.HashSet<>();
+
+
+
     // -----------------------------------------------------------------
     // Rotten Flesh purification on campfire (2 minutes)
     // -----------------------------------------------------------------
-    @EventHandler
-    public void onCampfireInteract(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        if (event.getClickedBlock() == null) return;
-        if (event.getClickedBlock().getType() != Material.CAMPFIRE &&
-            event.getClickedBlock().getType() != Material.SOUL_CAMPFIRE) return;
 
-        ItemStack item = event.getItem();
-        if (item == null || item.getType() != Material.ROTTEN_FLESH) return;
+@EventHandler
+public void onCampfireInteract(PlayerInteractEvent event) {
+    if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+    if (event.getClickedBlock() == null) return;
+    
+    Block campfire = event.getClickedBlock();
+    if (campfire.getType() != Material.CAMPFIRE &&
+        campfire.getType() != Material.SOUL_CAMPFIRE) return;
 
-        event.setCancelled(true);
-        Block campfire = event.getClickedBlock();
-        ItemStack flesh = item.clone();
-        flesh.setAmount(1);
+    ItemStack item = event.getItem();
+    if (item == null || item.getType() != Material.ROTTEN_FLESH) return;
+    Location loc = campfire.getLocation();
+    int currentCount = campfireCrops.getOrDefault(loc, 0);
 
-        item.setAmount(item.getAmount() - 1);
-
-        Bukkit.getScheduler().scheduleSyncDelayedTask(this, () -> {
-            campfire.getWorld().dropItemNaturally(campfire.getLocation().add(0.5, 1, 0.5), new ItemStack(Material.LEATHER));
-        }, 2400L); // 2 minutes
+    if (currentCount >= 5) {
+        event.getPlayer().sendMessage("§cCampfire is full, use another one");
+        return;
     }
 
+
+    event.setCancelled(true);
+    item.setAmount(item.getAmount() - 1);
+    campfireCrops.put(loc, currentCount + 1);
+
+    event.getPlayer().sendMessage("§eThe rotten flesh is beginning to cook; it will be turned into leather in 2 minutes.");
+    Bukkit.getScheduler().scheduleSyncDelayedTask(this, () -> {
+        if (campfire.getWorld() != null) {
+            campfire.getWorld().dropItemNaturally(loc.clone().add(0.5, 1, 0.5), new ItemStack(Material.LEATHER));
+        }
+
+        int newCount = campfireCrops.getOrDefault(loc, 0) - 1;
+        if (newCount <= 0) {
+            campfireCrops.remove(loc);
+        } else {
+            campfireCrops.put(loc, newCount);
+        }
+    }, 2400L); 
+}
 
 
   //-------------------------------------------------------------------
@@ -101,14 +146,19 @@ public final class DVPlus extends JavaPlugin implements Listener {
     }
 }
 
+@EventHandler
+public void onCauldronPlace(org.bukkit.event.block.BlockPlaceEvent event) {
+    if (event.getBlock().getType() == Material.CAULDRON) {
+        trackedCauldrons.add(event.getBlock().getLocation());
+    }
+}
 
-
-
-
-
-
-
-
+@EventHandler
+public void onCauldronBreak(org.bukkit.event.block.BlockBreakEvent event) {
+    if (event.getBlock().getType() == Material.CAULDRON) {
+        trackedCauldrons.remove(event.getBlock().getLocation());
+    }
+}
     // -----------------------------------------------------------------
     // Stonecutter tool sharpening
     // -----------------------------------------------------------------
@@ -149,24 +199,32 @@ public final class DVPlus extends JavaPlugin implements Listener {
     // -----------------------------------------------------------------
     // Frost-Bound Cauldron → Blue Ice in cold biomes overnight
     // -----------------------------------------------------------------
+    //NOTE: TO BE CHANGED
     private void startCauldronFrostTasks() {
-        Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () ->
-            Bukkit.getServer().getWorlds().forEach(world -> {
-                if (world.getEnvironment() != org.bukkit.World.Environment.NORMAL) return;
-                Arrays.stream(world.getLoadedChunks()).forEach(chunk -> {
-                    for (int x = 0; x < 16; x++) {
-                        for (int z = 0; z < 16; z++) {
-                            for (int y = world.getMinHeight(); y < world.getMaxHeight(); y++) {
-                                Block block = chunk.getBlock(x, y, z);
-                                if (block.getType() == Material.CAULDRON && Math.random() < 0.1) {
-                                    block.setType(Material.BLUE_ICE);
-                                }
-                            }
-                        }
-                    }
-                });
-            }), 0L, 24000L);
-    }
+      Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
+     java.util.Iterator<Location> iterator = trackedCauldrons.iterator();
+      
+     while(iterator.hasNext()){
+        Location loc = iterator.next();
+        if (loc.getWorld() == null || !loc.getWorld().isChunkLoaded(loc.getBlockX()>> 4, loc.getBlockZ() >> 4)){
+            continue;
+        }
+        Block block = loc.getBlock();
+        if(block.getType() != Material.CAULDRON){
+            iterator.remove();
+            continue;
+        }
+     //Temperature check? Might need a rework to get individual biomes
+        if (block.getTemperature() < 0.15){
+            if (Math.random() < 0.2){
+                block.setType(Material.BLUE_ICE);
+                iterator.remove();
+            }
+
+        }
+  }
+ },0L, 24000L);
+}
 
     private boolean isToolItem(ItemStack item) {
         return switch (item.getType()) {

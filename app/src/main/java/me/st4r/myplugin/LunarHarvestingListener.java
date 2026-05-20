@@ -1,3 +1,16 @@
+/*
+ * DVPlus (Dams's Vanilla +)
+ * Copyright (C) 2026 fxllingstar
+ *
+ * Licensed under the GNU Affero General Public License v3.0.
+ * If you run a modified version of this software as a service, 
+ * you must provide access to the source code of your modifications.
+ *
+ * Read the License file here: 
+ * https://github.com/fxllingstar/Dams-s-Vanilla-plus/blob/main/LICENSE
+ */
+
+
 package me.st4r.myplugin;
 
 import org.bukkit.*;
@@ -43,7 +56,9 @@ public class LunarHarvestingListener implements Listener {
         int next = ageable.getAge() + 1;
         if (next <= ageable.getMaximumAge()) {
             ageable.setAge(next);
-            event.getNewState().setBlockData(ageable);
+
+            event.setCancelled(true);
+            event.getBlock().setBlockData(ageable);
         }
     }
 
@@ -94,15 +109,16 @@ public class LunarHarvestingListener implements Listener {
     }
 
     private boolean isUndead(Entity entity) {
-        return entity instanceof Zombie
-                || entity instanceof Skeleton
-                || entity instanceof Stray
-                || entity instanceof WitherSkeleton
-                || entity instanceof Drowned
-                || entity instanceof Husk
-                || entity instanceof Phantom
-                || entity instanceof Wither
-                || entity instanceof ZombieVillager
-                || entity instanceof PigZombie; // ZombifiedPiglin pre-1.16 name kept for compatibility
-    }
+        EntityType type = entity.getType();
+        return type == EntityType.ZOMBIE
+                || type == EntityType.SKELETON
+                || type == EntityType.STRAY
+                || type == EntityType.WITHER_SKELETON
+                || type == EntityType.DROWNED
+                || type == EntityType.HUSK
+                || type == EntityType.PHANTOM
+                || type == EntityType.WITHER
+                || type == EntityType.ZOMBIE_VILLAGER
+                || type == EntityType.ZOMBIFIED_PIGLIN;
+}
 }
