@@ -1,5 +1,5 @@
 /*
- * DVPlus (Dams's Vanilla+)
+ * DVPlus (Dams's Vanilla +)
  * Copyright (C) 2026 fxllingstar
  *
  * Licensed under the GNU Affero General Public License v3.0.
@@ -9,7 +9,6 @@
  * Read the License file here: 
  * https://github.com/fxllingstar/Dams-s-Vanilla-plus/blob/main/LICENSE
  */
-
 
 
 package me.st4r.myplugin;

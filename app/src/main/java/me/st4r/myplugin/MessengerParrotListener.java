@@ -1,5 +1,5 @@
 /*
- * DVPlus (Dams's Vanilla+)
+ * DVPlus (Dams's Vanilla +)
  * Copyright (C) 2026 fxllingstar
  *
  * Licensed under the GNU Affero General Public License v3.0.

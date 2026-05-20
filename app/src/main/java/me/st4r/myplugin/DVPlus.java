@@ -1,5 +1,5 @@
 /*
- * DVPlus (Dams's Vanilla+)
+ * DVPlus (Dams's Vanilla +)
  * Copyright (C) 2026 fxllingstar
  *
  * Licensed under the GNU Affero General Public License v3.0.
@@ -17,11 +17,9 @@ package me.st4r.myplugin;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
-import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
@@ -57,7 +55,7 @@ public final class DVPlus extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(new LunarHarvestingListener(), this);
       
         getLogger().info("----------------------------------");
-        getLogger().info("Dams's Vanilla+ Enabled.");
+        getLogger().info("Dams's Vanilla + Enabled.");
         getLogger().info("'To become a star, you must burn.'");
         getLogger().info("----------------------------------");
         
@@ -67,10 +65,18 @@ public final class DVPlus extends JavaPlugin implements Listener {
         registerLuminousRecipes();
     }
 
+
+    //======================================================
+   //    HASHMAPS
+   //=======================================================
+ private final Map<Location, Integer> campfireCrops = new HashMap<>();
+ private final java.util.Set<Location> trackedCauldrons = new java.util.HashSet<>();
+
+
+
     // -----------------------------------------------------------------
     // Rotten Flesh purification on campfire (2 minutes)
     // -----------------------------------------------------------------
- private final Map<Location, Integer> campfireCrops = new HashMap<>();
 
 @EventHandler
 public void onCampfireInteract(PlayerInteractEvent event) {
@@ -140,14 +146,19 @@ public void onCampfireInteract(PlayerInteractEvent event) {
     }
 }
 
+@EventHandler
+public void onCauldronPlace(org.bukkit.event.block.BlockPlaceEvent event) {
+    if (event.getBlock().getType() == Material.CAULDRON) {
+        trackedCauldrons.add(event.getBlock().getLocation());
+    }
+}
 
-
-
-
-
-
-
-
+@EventHandler
+public void onCauldronBreak(org.bukkit.event.block.BlockBreakEvent event) {
+    if (event.getBlock().getType() == Material.CAULDRON) {
+        trackedCauldrons.remove(event.getBlock().getLocation());
+    }
+}
     // -----------------------------------------------------------------
     // Stonecutter tool sharpening
     // -----------------------------------------------------------------
@@ -188,24 +199,32 @@ public void onCampfireInteract(PlayerInteractEvent event) {
     // -----------------------------------------------------------------
     // Frost-Bound Cauldron → Blue Ice in cold biomes overnight
     // -----------------------------------------------------------------
+    //NOTE: TO BE CHANGED
     private void startCauldronFrostTasks() {
-        Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () ->
-            Bukkit.getServer().getWorlds().forEach(world -> {
-                if (world.getEnvironment() != org.bukkit.World.Environment.NORMAL) return;
-                Arrays.stream(world.getLoadedChunks()).forEach(chunk -> {
-                    for (int x = 0; x < 16; x++) {
-                        for (int z = 0; z < 16; z++) {
-                            for (int y = world.getMinHeight(); y < world.getMaxHeight(); y++) {
-                                Block block = chunk.getBlock(x, y, z);
-                                if (block.getType() == Material.CAULDRON && Math.random() < 0.1) {
-                                    block.setType(Material.BLUE_ICE);
-                                }
-                            }
-                        }
-                    }
-                });
-            }), 0L, 24000L);
-    }
+      Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
+     java.util.Iterator<Location> iterator = trackedCauldrons.iterator();
+      
+     while(iterator.hasNext()){
+        Location loc = iterator.next();
+        if (loc.getWorld() == null || !loc.getWorld().isChunkLoaded(loc.getBlockX()>> 4, loc.getBlockZ() >> 4)){
+            continue;
+        }
+        Block block = loc.getBlock();
+        if(block.getType() != Material.CAULDRON){
+            iterator.remove();
+            continue;
+        }
+     //Temperature check? Might need a rework to get individual biomes
+        if (block.getTemperature() < 0.15){
+            if (Math.random() < 0.2){
+                block.setType(Material.BLUE_ICE);
+                iterator.remove();
+            }
+
+        }
+  }
+ },0L, 24000L);
+}
 
     private boolean isToolItem(ItemStack item) {
         return switch (item.getType()) {
