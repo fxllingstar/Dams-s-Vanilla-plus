@@ -29,7 +29,6 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.inventory.meta.Damageable;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.bukkit.Location;
