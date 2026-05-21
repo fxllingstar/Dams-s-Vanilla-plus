@@ -29,7 +29,6 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.inventory.meta.Damageable;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import org.bukkit.Location;
@@ -178,8 +177,8 @@ public void onCauldronBreak(org.bukkit.event.block.BlockBreakEvent event) {
         int damage = damageable.getDamage();
         int maxDurability = item.getType().getMaxDurability();
 
-        if (damage + 10 <= maxDurability) {
-            damageable.setDamage(damage + 10);
+        if (damage + 50 <= maxDurability) {
+            damageable.setDamage(damage + 50);
             item.setItemMeta(damageable);
 
             String toolType = item.getType().toString();
@@ -210,15 +209,19 @@ public void onCauldronBreak(org.bukkit.event.block.BlockBreakEvent event) {
             continue;
         }
         Block block = loc.getBlock();
-        if(block.getType() != Material.CAULDRON){
+        Material type = block.getType();
+        if(type != Material.CAULDRON && type != Material.WATER_CAULDRON){
             iterator.remove();
             continue;
         }
      //Temperature check? Might need a rework to get individual biomes
-        if (block.getTemperature() < 0.15){
+        if (block.getTemperature() < 0.15 && type == Material.WATER_CAULDRON){
             if (Math.random() < 0.2){
-                block.setType(Material.BLUE_ICE);
-                iterator.remove();
+                block.setType(Material.CAULDRON);
+                block.getWorld().dropItemNaturally(
+                    loc.clone().add(0.5, 1, 0.5),
+                    new ItemStack(Material.BLUE_ICE)
+                );
             }
 
         }
@@ -235,3 +238,4 @@ public void onCauldronBreak(org.bukkit.event.block.BlockBreakEvent event) {
         };
     }
 }
+//The morning light is blue the feeling is bizzaree~
