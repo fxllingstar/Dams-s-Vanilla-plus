@@ -56,15 +56,10 @@ public class EchoSonarListener implements Listener {
     private static final int PULSE_RADIUS = 15;
     private static final int GLOW_DURATION_TICKS = 100;
     private static final int MAX_USES = 5;
+    private static final int MAX_ORE_HIGHLIGHTS = 50;
     private static final Component SONAR_NAME = Component.text("Subterranean Sonar", NamedTextColor.DARK_AQUA);
 
     private static final Set<Material> SONAR_ORES = EnumSet.of(
-            Material.COAL_ORE,
-            Material.DEEPSLATE_COAL_ORE,
-            Material.IRON_ORE,
-            Material.DEEPSLATE_IRON_ORE,
-            Material.COPPER_ORE,
-            Material.DEEPSLATE_COPPER_ORE,
             Material.GOLD_ORE,
             Material.DEEPSLATE_GOLD_ORE,
             Material.REDSTONE_ORE,
@@ -295,7 +290,7 @@ public class EchoSonarListener implements Listener {
         }
     }
 
-    private void highlightNearbyOres(Player player) {
+   private void highlightNearbyOres(Player player) {
         removeOreHighlights(player.getUniqueId());
 
         World world = player.getWorld();
@@ -304,7 +299,9 @@ public class EchoSonarListener implements Listener {
         int centerZ = player.getLocation().getBlockZ();
         int radiusSquared = PULSE_RADIUS * PULSE_RADIUS;
         List<UUID> spawnedDisplays = new ArrayList<>();
+        Set<Long> highlightedBlocks = new java.util.HashSet<>();
 
+        scanLoop:
         for (int x = -PULSE_RADIUS; x <= PULSE_RADIUS; x++) {
             for (int y = -PULSE_RADIUS; y <= PULSE_RADIUS; y++) {
                 for (int z = -PULSE_RADIUS; z <= PULSE_RADIUS; z++) {
@@ -315,6 +312,10 @@ public class EchoSonarListener implements Listener {
 
                     Block block = world.getBlockAt(centerX + x, centerY + y, centerZ + z);
                     if (!SONAR_ORES.contains(block.getType())) {
+                        continue;
+                    }
+
+                    if (hasAdjacentHighlight(block.getX(), block.getY(), block.getZ(), highlightedBlocks)) {
                         continue;
                     }
 
@@ -338,6 +339,11 @@ public class EchoSonarListener implements Listener {
                     }
 
                     spawnedDisplays.add(display.getUniqueId());
+                    highlightedBlocks.add(packBlockPos(block.getX(), block.getY(), block.getZ()));
+
+                    if (spawnedDisplays.size() >= MAX_ORE_HIGHLIGHTS) {
+                        break scanLoop;
+                    }
                 }
             }
         }
@@ -355,7 +361,6 @@ public class EchoSonarListener implements Listener {
         if (entityIds == null) {
             return;
         }
-
         removeEntities(entityIds);
     }
 
@@ -369,7 +374,6 @@ public class EchoSonarListener implements Listener {
         if (activeIds.equals(entityIds)) {
             activeOreHighlights.remove(playerId);
         }
-
         removeEntities(entityIds);
     }
 
@@ -380,6 +384,21 @@ public class EchoSonarListener implements Listener {
                 entity.remove();
             }
         }
+    }
+
+    private boolean hasAdjacentHighlight(int x, int y, int z, Set<Long> highlightedBlocks) {
+        return highlightedBlocks.contains(packBlockPos(x + 1, y, z))
+                || highlightedBlocks.contains(packBlockPos(x - 1, y, z))
+                || highlightedBlocks.contains(packBlockPos(x, y + 1, z))
+                || highlightedBlocks.contains(packBlockPos(x, y - 1, z))
+                || highlightedBlocks.contains(packBlockPos(x, y, z + 1))
+                || highlightedBlocks.contains(packBlockPos(x, y, z - 1));
+    }
+
+    private long packBlockPos(int x, int y, int z) {
+        return ((long) (x & 0x3FFFFFF) << 38)
+                | ((long) (z & 0x3FFFFFF) << 12)
+                | (y & 0xFFF);
     }
 
     private void cleanupPlayer(UUID playerId) {
