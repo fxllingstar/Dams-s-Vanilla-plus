@@ -39,6 +39,7 @@ import org.bukkit.NamespacedKey;
 public final class DVPlus extends JavaPlugin implements Listener {
 
     public static final NamespacedKey LUMINOUS_KEY = new NamespacedKey("dvplus", "luminous_time");
+    private EchoSonarListener echoSonarListener;
 
 
     
@@ -47,7 +48,9 @@ public final class DVPlus extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
 
         MessengerParrotListener parrotListener = new MessengerParrotListener(this);
+        echoSonarListener = new EchoSonarListener(this);
         getServer().getPluginManager().registerEvents(parrotListener, this);
+        getServer().getPluginManager().registerEvents(echoSonarListener, this);
         getCommand("parrot").setExecutor(parrotListener);
         getServer().getPluginManager().registerEvents(new SmithingTableListener(), this);
         getServer().getPluginManager().registerEvents(new HitchMechanicListener(this), this);
@@ -62,6 +65,13 @@ public final class DVPlus extends JavaPlugin implements Listener {
          new LuminousDecayTask().runTaskTimer(this, 20L, 20L); 
         startCauldronFrostTasks();  
         registerLuminousRecipes();
+    }
+
+    @Override
+    public void onDisable() {
+        if (echoSonarListener != null) {
+            echoSonarListener.shutdown();
+        }
     }
 
 
