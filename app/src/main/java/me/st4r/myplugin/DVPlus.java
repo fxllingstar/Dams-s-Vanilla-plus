@@ -54,6 +54,7 @@ public final class DVPlus extends JavaPlugin implements Listener {
         getCommand("parrot").setExecutor(parrotListener);
         getServer().getPluginManager().registerEvents(new SmithingTableListener(), this);
         getServer().getPluginManager().registerEvents(new HitchMechanicListener(this), this);
+        getServer().getPluginManager().registerEvents(new KineticTrampolineListener(this), this);
         getServer().getPluginManager().registerEvents(new LunarHarvestingListener(), this);
       
         getLogger().info("----------------------------------");
