@@ -10,9 +10,6 @@
  * https://github.com/fxllingstar/Dams-s-Vanilla-plus/blob/main/LICENSE
  */
 
-
-
-
 package me.st4r.myplugin;
 
 import org.bukkit.Bukkit;
