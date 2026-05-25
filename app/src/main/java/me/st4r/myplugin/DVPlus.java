@@ -49,14 +49,18 @@ public final class DVPlus extends JavaPlugin implements Listener {
 
         MessengerParrotListener parrotListener = new MessengerParrotListener(this);
         echoSonarListener = new EchoSonarListener(this);
+        KineticGridListener gridListener = new KineticGridListener();
+        GcgAutomationListener gcgListener = new GcgAutomationListener(gridListener);
         getServer().getPluginManager().registerEvents(parrotListener, this);
         getServer().getPluginManager().registerEvents(echoSonarListener, this);
         getCommand("parrot").setExecutor(parrotListener);
         getServer().getPluginManager().registerEvents(new SmithingTableListener(), this);
         getServer().getPluginManager().registerEvents(new HitchMechanicListener(this), this);
-        getServer().getPluginManager().registerEvents(new KineticTrampolineListener(this), this);
+        getServer().getPluginManager().registerEvents(new KineticTrampolineListener(this, gridListener), this);
         getServer().getPluginManager().registerEvents(new LunarHarvestingListener(), this);
-      
+        getServer().getPluginManager().registerEvents(gridListener, this);
+        getServer().getPluginManager().registerEvents(gcgListener, this);
+        getCommand("gcg").setExecutor(gcgListener);
         getLogger().info("----------------------------------");
         getLogger().info("Dams's Vanilla + Enabled.");
         getLogger().info("'To become a star, you must burn.'");

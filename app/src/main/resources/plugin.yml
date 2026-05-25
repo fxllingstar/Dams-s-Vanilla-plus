@@ -8,3 +8,6 @@ commands:
   parrot:
     description: Control your messenger parrot
     usage: /parrot deliver <PlayerName>
+  gcg:
+    description: Control the GCG automation grid mode
+    usage: /gcg mode <0-4>
