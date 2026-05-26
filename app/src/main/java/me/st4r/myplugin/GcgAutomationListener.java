@@ -22,6 +22,7 @@ import org.bukkit.block.data.Ageable;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.entity.EvokerFangs;
 import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
@@ -33,12 +34,16 @@ import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 public class GcgAutomationListener implements Listener, CommandExecutor {
+
+    private static final long DIAGNOSTIC_COOLDOWN_MILLIS = 500L;
 
     private final KineticGridListener gridManager;
     private final Map<Long, Long> sculkCooldowns = new HashMap<>();
     private final Map<Long, Boolean> sculkCache = new HashMap<>();
+    private final Map<UUID, Long> diagnosticCooldowns = new HashMap<>();
 
     public GcgAutomationListener(KineticGridListener gridManager) {
         this.gridManager = gridManager;
@@ -106,8 +111,16 @@ public class GcgAutomationListener implements Listener, CommandExecutor {
     @EventHandler
     public void onDiagnosticCheck(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (event.getHand() != EquipmentSlot.HAND) return;
         Block block = event.getClickedBlock();
         if (block == null || block.getType() != Material.GOLD_BLOCK) return;
+
+        Player player = event.getPlayer();
+        long now = System.currentTimeMillis();
+        if (diagnosticCooldowns.getOrDefault(player.getUniqueId(), 0L) > now) {
+            event.setCancelled(true);
+            return;
+        }
 
         if (block.getBlockPower() > 0) {
             if (!isConnectedToGrid(block)) return;
@@ -115,7 +128,8 @@ public class GcgAutomationListener implements Listener, CommandExecutor {
             double charge = gridManager.getGridBattery(block.getChunk());
             int mode = gridManager.getGridMode(block.getChunk());
             String modeName = getModeDisplayName(mode);
-            event.getPlayer().sendMessage(String.format("§8[§6Grid Monitor§8] §7Field Energy: §e%.1f%% §8| §7Mode: §b%s", charge, modeName));
+            player.sendMessage(String.format("§8[§6Grid Monitor§8] §7Field Energy: §e%.1f%% §8| §7Mode: §b%s", charge, modeName));
+            diagnosticCooldowns.put(player.getUniqueId(), now + DIAGNOSTIC_COOLDOWN_MILLIS);
             event.setCancelled(true);
         }
     }

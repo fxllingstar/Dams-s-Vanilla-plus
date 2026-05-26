@@ -12,6 +12,8 @@
 
 package me.st4r.myplugin;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
@@ -21,12 +23,14 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.weather.LightningStrikeEvent;
+import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
@@ -36,7 +40,7 @@ public class KineticGridListener implements Listener  {
     private static final int MAX_WIRE_LENGTH = 16;
     private static final double MAX_BATTERY = 100.0;
     private static final double NATURAL_LIGHTNING_CHARGE = 100.0;
-    private static final double TRIDENT_CHARGE_AMOUNT = 25.0;
+    private static final double TRIDENT_CHARGE_AMOUNT = 20.0;
     private static final double TRIDENT_CHANCE = 0.20;
 
     private static final BlockFace[] CONDUCTIVE_FACES = {
@@ -89,12 +93,18 @@ public class KineticGridListener implements Listener  {
         if (!isLightningRod(strikeBlock.getType())) return;
 
         double chargeToApply = NATURAL_LIGHTNING_CHARGE;
+        String chargeSource = "lightning";
+        Player recipient = null;
+
         if (event.getCause() == LightningStrikeEvent.Cause.TRIDENT) {
             chargeToApply = resolveTridentCharge(strikeBlock);
+            chargeSource = "trident";
+            recipient = event.getLightning().getCausingPlayer();
         }
 
         if (chargeToApply <= 0.0) return;
         chargeGridNetwork(strikeBlock, chargeToApply);
+        sendChargeFeedback(strikeBlock, chargeSource, recipient);
     }
 
     public double getGridBattery(Chunk currentChunk) {
@@ -146,6 +156,24 @@ public class KineticGridListener implements Listener  {
                     queue.add(neighbor);
                 }
             }
+        }
+    }
+
+    private void sendChargeFeedback(Block strikeBlock, String source, Player directRecipient) {
+        Component message = Component.text("Chunk charged with " + source + "!", NamedTextColor.AQUA);
+
+        if (directRecipient != null && directRecipient.isOnline()) {
+            directRecipient.sendActionBar(message);
+            return;
+        }
+
+        List<Player> nearbyPlayers = strikeBlock.getWorld().getPlayers().stream()
+                .filter(player -> player.getWorld().equals(strikeBlock.getWorld()))
+                .filter(player -> player.getLocation().distanceSquared(strikeBlock.getLocation()) <= 4096.0D)
+                .toList();
+
+        for (Player player : nearbyPlayers) {
+            player.sendActionBar(message);
         }
     }
 
