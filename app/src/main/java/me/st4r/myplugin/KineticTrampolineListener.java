@@ -17,7 +17,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
-import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Piston;
 import org.bukkit.block.data.type.PistonHead;
 import org.bukkit.entity.Player;
@@ -58,7 +57,6 @@ public class KineticTrampolineListener implements Listener {
     private static final long FALL_PROTECTION_MILLIS = 15_000L; 
     private static final long LAUNCH_COOLDOWN_MILLIS = 400L;
     private static final int MAX_CONNECTED_SLIMES = 9; 
-    private static final boolean DEBUG = false;
 
     private final NamespacedKey trampolineBoostKey;
     private final Map<UUID, Long> launchCooldowns = new HashMap<>();
