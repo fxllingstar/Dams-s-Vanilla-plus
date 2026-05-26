@@ -31,6 +31,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockGrowEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import io.papermc.paper.event.entity.EntityMoveEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import java.util.HashMap;
 import java.util.Map;
@@ -52,23 +53,19 @@ public class GcgAutomationListener implements Listener, CommandExecutor {
     @EventHandler(ignoreCancelled = true)
     public void onMobSpawn(CreatureSpawnEvent event) {
         if (!(event.getEntity() instanceof Monster monster)) return;
+        handleHostileMob(monster, monster.getLocation());
+    }
 
-        Chunk chunk = monster.getLocation().getChunk();
-        int mode = gridManager.getGridMode(chunk);
+    @EventHandler(ignoreCancelled = true)
+    public void onMobMove(EntityMoveEvent event) {
+        if (!(event.getEntity() instanceof Monster monster)) return;
+        if (!event.hasChangedBlock()) return;
 
-        if (mode == 1 || mode == 4) return;
+        Location to = event.getTo();
+        if (to == null) return;
+        if (event.getFrom() != null && event.getFrom().getChunk().equals(to.getChunk())) return;
 
-        double battery = gridManager.getGridBattery(chunk);
-        if (battery <= 0.5) return;
-
-        long chunkKey = ((long) chunk.getX() << 32) | (chunk.getZ() & 0xFFFFFFFFL);
-        if (hasSculkSensorCached(chunk, chunkKey)) return;
-
-        Location loc = monster.getLocation();
-        loc.getWorld().spawn(loc, EvokerFangs.class);
-
-        monster.damage(100.0);
-        gridManager.modifyBattery(chunk, -0.5);
+        handleHostileMob(monster, to);
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -106,6 +103,22 @@ public class GcgAutomationListener implements Listener, CommandExecutor {
             }
         }
         return false;
+    }
+
+    private void handleHostileMob(Monster monster, Location location) {
+        Chunk chunk = location.getChunk();
+        int mode = gridManager.getGridMode(chunk);
+        if (mode == 1 || mode == 4) return;
+
+        double battery = gridManager.getGridBattery(chunk);
+        if (battery <= 0.5) return;
+
+        long chunkKey = ((long) chunk.getX() << 32) | (chunk.getZ() & 0xFFFFFFFFL);
+        if (hasSculkSensorCached(chunk, chunkKey)) return;
+
+        location.getWorld().spawn(location, EvokerFangs.class);
+        monster.damage(100.0);
+        gridManager.modifyBattery(chunk, -0.5);
     }
 
     @EventHandler
