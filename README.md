@@ -110,7 +110,7 @@ Players wearing luminous gear get a temporary personal light source.
 ## Notes
 
 - Built for Paper
-- Target version in `app/build.gradle`: `1.21.11-R0.1-SNAPSHOT`
+- Target version in `app/build.gradle`: `PAPER 1.21.11-R0.1-SNAPSHOT`
 - Java target: `21`
 
 ## License
