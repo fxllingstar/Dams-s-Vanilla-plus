@@ -10,4 +10,7 @@ commands:
     usage: /parrot deliver <PlayerName>
   gcg:
     description: Control the GCG automation grid mode
-    usage: /gcg mode <0-4>
+    usage: /gcg <mode|transfer>
+  displaybattery:
+    description: Toggle live battery readouts when you change chunks
+    usage: /displaybattery

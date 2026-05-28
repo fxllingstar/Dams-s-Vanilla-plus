@@ -61,6 +61,9 @@ public final class DVPlus extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(gridListener, this);
         getServer().getPluginManager().registerEvents(gcgListener, this);
         getCommand("gcg").setExecutor(gcgListener);
+        getCommand("gcg").setTabCompleter(gcgListener);
+        getCommand("displaybattery").setExecutor(gcgListener);
+        getCommand("displaybattery").setTabCompleter(gcgListener);
         getLogger().info("----------------------------------");
         getLogger().info("Dams's Vanilla + Enabled.");
         getLogger().info("'To become a star, you must burn.'");

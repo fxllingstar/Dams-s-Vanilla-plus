@@ -36,7 +36,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class KineticGridListener implements Listener  {
 
-    private static final int MAX_WIRE_LENGTH = 16;
+    private static final int MAX_TRANSFER_SEARCH_BLOCKS = 16384;
     private static final double MAX_BATTERY = 100.0;
     private static final double NATURAL_LIGHTNING_CHARGE = 100.0;
     private static final double TRIDENT_CHARGE_AMOUNT = 20.0;
@@ -71,18 +71,15 @@ public class KineticGridListener implements Listener  {
     ));
 
     private final NamespacedKey sourceBatteryKey;
-    private final NamespacedKey linkedSourceKey;
     private final NamespacedKey gcgModeKey;
 
     public KineticGridListener() {
         this.sourceBatteryKey = new NamespacedKey("dvplus", "gcg_source_battery");
-        this.linkedSourceKey = new NamespacedKey("dvplus", "gcg_linked_source_chunk");
         this.gcgModeKey = new NamespacedKey("dvplus", "gcg_mode");
     }
 
     public KineticGridListener(DVPlus plugin) {
         this.sourceBatteryKey = new NamespacedKey(plugin, "gcg_source_battery");
-        this.linkedSourceKey = new NamespacedKey(plugin, "gcg_linked_source_chunk");
         this.gcgModeKey = new NamespacedKey(plugin, "gcg_mode");
     }
 
@@ -102,60 +99,38 @@ public class KineticGridListener implements Listener  {
         }
 
         if (chargeToApply <= 0.0) return;
-        chargeGridNetwork(strikeBlock, chargeToApply);
+        chargeChunkBattery(strikeBlock.getChunk(), chargeToApply);
         sendChargeFeedback(strikeBlock, chargeSource, recipient);
     }
 
     public double getGridBattery(Chunk currentChunk) {
-        PersistentDataContainer pdc = currentChunk.getPersistentDataContainer();
-        if (pdc.has(sourceBatteryKey, PersistentDataType.DOUBLE)) {
-            return clampBattery(pdc.getOrDefault(sourceBatteryKey, PersistentDataType.DOUBLE, 0.0));
-        }
-
-        Chunk sourceChunk = resolveSourceChunk(currentChunk);
-        if (sourceChunk == null) return 0.0;
-
-        return clampBattery(sourceChunk.getPersistentDataContainer()
+        return clampBattery(currentChunk.getPersistentDataContainer()
                 .getOrDefault(sourceBatteryKey, PersistentDataType.DOUBLE, 0.0));
     }
 
     public void modifyBattery(Chunk currentChunk, double delta) {
-        PersistentDataContainer targetPdc = resolveBatteryContainer(currentChunk);
+        PersistentDataContainer targetPdc = currentChunk.getPersistentDataContainer();
         double current = targetPdc.getOrDefault(sourceBatteryKey, PersistentDataType.DOUBLE, 0.0);
         targetPdc.set(sourceBatteryKey, PersistentDataType.DOUBLE, clampBattery(current + delta));
     }
 
-    private void chargeGridNetwork(Block startBlock, double chargeAmount) {
-        Chunk sourceChunk = startBlock.getChunk();
-        long sourceChunkKey = getChunkKey(sourceChunk);
-        PersistentDataContainer sourcePdc = sourceChunk.getPersistentDataContainer();
+    public double transferBattery(Chunk fromChunk, Chunk toChunk) {
+        if (fromChunk == null || toChunk == null) return 0.0;
+        if (!fromChunk.getWorld().equals(toChunk.getWorld())) return 0.0;
+        if (fromChunk.equals(toChunk)) return 0.0;
 
-        double currentCharge = sourcePdc.getOrDefault(sourceBatteryKey, PersistentDataType.DOUBLE, 0.0);
-        sourcePdc.set(sourceBatteryKey, PersistentDataType.DOUBLE, clampBattery(currentCharge + chargeAmount));
+        if (!containsLightningRod(fromChunk) || !containsLightningRod(toChunk)) return 0.0;
+        if (!hasPoweredTransferSignal(toChunk)) return 0.0;
+        if (!hasTransferPath(fromChunk, toChunk)) return 0.0;
 
-        Queue<Block> queue = new ArrayDeque<>();
-        Set<Long> visited = new HashSet<>();
-        queue.add(startBlock);
+        double sourceBattery = getGridBattery(fromChunk);
+        double targetBattery = getGridBattery(toChunk);
+        double transferable = Math.min(sourceBattery, MAX_BATTERY - targetBattery);
+        if (transferable <= 0.0) return 0.0;
 
-        while (!queue.isEmpty()) {
-            Block current = queue.poll();
-
-            if (!current.getChunk().equals(sourceChunk)) {
-                current.getChunk().getPersistentDataContainer()
-                        .set(linkedSourceKey, PersistentDataType.LONG, sourceChunkKey);
-            }
-
-            for (BlockFace face : CONDUCTIVE_FACES) {
-                if (visited.size() >= MAX_WIRE_LENGTH) break;
-
-                Block neighbor = current.getRelative(face);
-                if (!isConductiveMaterial(neighbor.getType())) continue;
-
-                if (visited.add(neighbor.getBlockKey())) {
-                    queue.add(neighbor);
-                }
-            }
-        }
+        modifyBattery(fromChunk, -transferable);
+        modifyBattery(toChunk, transferable);
+        return transferable;
     }
 
     private void sendChargeFeedback(Block strikeBlock, String source, Player directRecipient) {
@@ -176,25 +151,94 @@ public class KineticGridListener implements Listener  {
         }
     }
 
-    private Chunk resolveSourceChunk(Chunk currentChunk) {
-        Long sourceKey = currentChunk.getPersistentDataContainer().get(linkedSourceKey, PersistentDataType.LONG);
-        if (sourceKey == null) return null;
-
-        int sourceX = (int) (sourceKey >> 32);
-        int sourceZ = (int) (sourceKey.longValue());
-        return currentChunk.getWorld().getChunkAt(sourceX, sourceZ);
+    private void chargeChunkBattery(Chunk chunk, double chargeAmount) {
+        PersistentDataContainer pdc = chunk.getPersistentDataContainer();
+        double currentCharge = pdc.getOrDefault(sourceBatteryKey, PersistentDataType.DOUBLE, 0.0);
+        pdc.set(sourceBatteryKey, PersistentDataType.DOUBLE, clampBattery(currentCharge + chargeAmount));
     }
 
-    private PersistentDataContainer resolveBatteryContainer(Chunk currentChunk) {
-        PersistentDataContainer local = currentChunk.getPersistentDataContainer();
-        if (local.has(sourceBatteryKey, PersistentDataType.DOUBLE)) {
-            return local;
+    private boolean containsLightningRod(Chunk chunk) {
+        return containsMaterial(chunk, Material.LIGHTNING_ROD);
+    }
+
+    private boolean hasPoweredTransferSignal(Chunk chunk) {
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = chunk.getWorld().getMinHeight(); y < chunk.getWorld().getMaxHeight(); y++) {
+                    Block block = chunk.getBlock(x, y, z);
+                    if (!isTransferMaterial(block.getType())) continue;
+                    if (block.getBlockPower() > 0) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasTransferPath(Chunk fromChunk, Chunk toChunk) {
+        Queue<Block> queue = new ArrayDeque<>();
+        Set<Long> visited = new HashSet<>();
+        boolean foundSeed = false;
+
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = fromChunk.getWorld().getMinHeight(); y < fromChunk.getWorld().getMaxHeight(); y++) {
+                    Block block = fromChunk.getBlock(x, y, z);
+                    if (!isTransferMaterial(block.getType())) continue;
+                    if (visited.add(block.getBlockKey())) {
+                        queue.add(block);
+                        foundSeed = true;
+                    }
+                }
+            }
         }
 
-        Chunk sourceChunk = resolveSourceChunk(currentChunk);
-        if (sourceChunk == null) return local;
+        if (!foundSeed) return false;
 
-        return sourceChunk.getPersistentDataContainer();
+        int explored = 0;
+        while (!queue.isEmpty() && explored < MAX_TRANSFER_SEARCH_BLOCKS) {
+            Block current = queue.poll();
+            explored++;
+
+            if (current.getChunk().equals(toChunk)) {
+                return true;
+            }
+
+            for (BlockFace face : CONDUCTIVE_FACES) {
+                Block neighbor = current.getRelative(face);
+                if (!isTransferMaterial(neighbor.getType())) continue;
+
+                if (visited.add(neighbor.getBlockKey())) {
+                    queue.add(neighbor);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean containsMaterial(Chunk chunk, Material material) {
+        return containsMaterial(chunk, type -> type == material);
+    }
+
+    private boolean containsMaterial(Chunk chunk, java.util.function.Predicate<Material> predicate) {
+        for (int x = 0; x < 16; x++) {
+            for (int z = 0; z < 16; z++) {
+                for (int y = chunk.getWorld().getMinHeight(); y < chunk.getWorld().getMaxHeight(); y++) {
+                    Material type = chunk.getBlock(x, y, z).getType();
+                    if (predicate.test(type)) return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean isTransferMaterial(Material type) {
+        return type == Material.LIGHTNING_ROD
+                || type == Material.REDSTONE_WIRE
+                || type == Material.REDSTONE_BLOCK
+                || type == Material.REPEATER
+                || type == Material.COMPARATOR
+                || isConductiveMaterial(type);
     }
 
     public boolean isConductiveMaterial(Material type) {
