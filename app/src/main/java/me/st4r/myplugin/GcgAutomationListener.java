@@ -3,10 +3,10 @@
  * Copyright (C) 2026 fxllingstar
  *
  * Licensed under the GNU Affero General Public License v3.0.
- * If you run a modified version of this software as a service, 
+ * If you run a modified version of this software as a service,
  * you must provide access to the source code of your modifications.
  *
- * Read the License file here: 
+ * Read the License file here:
  * https://github.com/fxllingstar/Dams-s-Vanilla-plus/blob/main/LICENSE
  */
 
@@ -143,13 +143,13 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
         if (!cmd.getName().equalsIgnoreCase("gcg")) return false;
 
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("\u00A7cThis command can only be used by players.");
+            sender.sendMessage("§cThis command can only be used by players.");
             return true;
         }
 
         if (args.length == 0) {
-            sender.sendMessage("\u00A7cUsage: /gcg mode <0-4>");
-            sender.sendMessage("\u00A7cUsage: /gcg transfer <fromChunkX> <fromChunkZ> <toChunkX> <toChunkZ> [amount]");
+            sender.sendMessage("§cUsage: /gcg mode <0-4>");
+            sender.sendMessage("§cUsage: /gcg transfer <fromChunkX> <fromChunkZ> <toChunkX> <toChunkZ> [amount]");
             return true;
         }
 
@@ -161,13 +161,13 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
             return handleTransferCommand(player, sender, args);
         }
 
-        sender.sendMessage("\u00A7cUnknown subcommand. Use /gcg mode or /gcg transfer.");
+        sender.sendMessage("§cUnknown subcommand. Use /gcg mode or /gcg transfer.");
         return true;
     }
 
     private boolean handleModeCommand(Player player, CommandSender sender, String[] args) {
         if (args.length != 2) {
-            sender.sendMessage("\u00A7cUsage: /gcg mode <0-4>");
+            sender.sendMessage("§cUsage: /gcg mode <0-4>");
             return true;
         }
 
@@ -175,25 +175,25 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
         try {
             mode = Integer.parseInt(args[1]);
         } catch (NumberFormatException e) {
-            sender.sendMessage("\u00A7cMode must be a number between 0 and 4.");
+            sender.sendMessage("§cMode must be a number between 0 and 4.");
             return true;
         }
 
         if (mode < 0 || mode > 4) {
-            sender.sendMessage("\u00A7cMode must be between 0 and 4.");
+            sender.sendMessage("§cMode must be between 0 and 4.");
             return true;
         }
 
         Chunk chunk = player.getLocation().getChunk();
         gridManager.setGridMode(chunk, mode);
         String modeName = getModeDisplayName(mode);
-        player.sendMessage(String.format("\u00A78[\u00A76GCG\u00A78] \u00A77Mode set to \u00A7b%s \u00A77(\u00A7e%d\u00A77)", modeName, mode));
+        player.sendMessage(String.format("§8[§6GCG§8] §7Mode set to §b%s §7(§e%d§7)", modeName, mode));
         return true;
     }
 
     private boolean handleTransferCommand(Player player, CommandSender sender, String[] args) {
         if (args.length != 5 && args.length != 6) {
-            sender.sendMessage("\u00A7cUsage: /gcg transfer <fromChunkX> <fromChunkZ> <toChunkX> <toChunkZ> [amount]");
+            sender.sendMessage("§cUsage: /gcg transfer <fromChunkX> <fromChunkZ> <toChunkX> <toChunkZ> [amount]");
             return true;
         }
 
@@ -207,7 +207,7 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
             toX = Integer.parseInt(args[3]);
             toZ = Integer.parseInt(args[4]);
         } catch (NumberFormatException e) {
-            sender.sendMessage("\u00A7cChunk coordinates must be whole numbers.");
+            sender.sendMessage("§cChunk coordinates must be whole numbers.");
             return true;
         }
 
@@ -215,13 +215,13 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
         Chunk toChunk = player.getWorld().getChunkAt(toX, toZ);
 
         if (gridManager.sharesBatterySource(fromChunk, toChunk)) {
-            sender.sendMessage("\u00A7cThose chunks already share the same power source.");
+            sender.sendMessage("§cThose chunks already share the same power source.");
             return true;
         }
 
         double sourceBattery = gridManager.getGridBattery(fromChunk);
         if (sourceBattery <= 0.0) {
-            sender.sendMessage("\u00A7cThe source chunk has no electricity to transfer.");
+            sender.sendMessage("§cThe source chunk has no electricity to transfer.");
             return true;
         }
 
@@ -230,25 +230,25 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
             try {
                 amount = Double.parseDouble(args[5]);
             } catch (NumberFormatException e) {
-                sender.sendMessage("\u00A7cAmount must be a positive number.");
+                sender.sendMessage("§cAmount must be a positive number.");
                 return true;
             }
             if (amount <= 0.0) {
-                sender.sendMessage("\u00A7cAmount must be greater than 0.");
+                sender.sendMessage("§cAmount must be greater than 0.");
                 return true;
             }
         }
 
         double moved = gridManager.transferBattery(fromChunk, toChunk, amount);
         if (moved <= 0.0) {
-            sender.sendMessage("\u00A7cNo electricity was moved. The destination chunk may already be full.");
+            sender.sendMessage("§cNo electricity was moved. The destination chunk may already be full.");
             return true;
         }
 
         double fromRemaining = gridManager.getGridBattery(fromChunk);
         double toNow = gridManager.getGridBattery(toChunk);
         sender.sendMessage(String.format(
-                "\u00A78[\u00A76GCG\u00A78] \u00A7aTransferred \u00A7e%.1f%%\u00A7a power from \u00A7b(%d, %d)\u00A7a to \u00A7b(%d, %d)\u00A7a. \u00A77Source: \u00A7e%.1f%%\u00A77, Dest: \u00A7e%.1f%%",
+                "§8[§6GCG§8] §aTransferred §e%.1f%%§a power from §b(%d, %d)§a to §b(%d, %d)§a. §7Source: §e%.1f%%§7, Dest: §e%.1f%%",
                 moved, fromX, fromZ, toX, toZ, fromRemaining, toNow
         ));
         return true;
@@ -320,14 +320,6 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
             default -> "UNKNOWN";
         };
     }
-
-    
-
-    private void sendGcgUsage(CommandSender sender) {
-        sender.sendMessage("§8[§6GCG§8] §7Usage:");
-        sender.sendMessage("§7/gcg mode <0-4>");
-        sender.sendMessage("§7/gcg transfer <fromChunkX> <fromChunkZ>");
-        sender.sendMessage("§8Run transfer in the chunk that should receive the battery.");
-    }
 }
+
 
