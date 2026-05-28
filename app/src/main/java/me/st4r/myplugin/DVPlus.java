@@ -51,9 +51,12 @@ public final class DVPlus extends JavaPlugin implements Listener {
         echoSonarListener = new EchoSonarListener(this);
         KineticGridListener gridListener = new KineticGridListener();
         GcgAutomationListener gcgListener = new GcgAutomationListener(gridListener);
+        BatteryDisplayListener batteryDisplayListener = new BatteryDisplayListener(gridListener);
         getServer().getPluginManager().registerEvents(parrotListener, this);
         getServer().getPluginManager().registerEvents(echoSonarListener, this);
         getCommand("parrot").setExecutor(parrotListener);
+        getServer().getPluginManager().registerEvents(batteryDisplayListener, this);
+        getCommand("batterydisplay").setExecutor(batteryDisplayListener);
         getServer().getPluginManager().registerEvents(new SmithingTableListener(), this);
         getServer().getPluginManager().registerEvents(new HitchMechanicListener(this), this);
         getServer().getPluginManager().registerEvents(new KineticTrampolineListener(this, gridListener), this);
@@ -62,8 +65,6 @@ public final class DVPlus extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(gcgListener, this);
         getCommand("gcg").setExecutor(gcgListener);
         getCommand("gcg").setTabCompleter(gcgListener);
-        getCommand("displaybattery").setExecutor(gcgListener);
-        getCommand("displaybattery").setTabCompleter(gcgListener);
         getLogger().info("----------------------------------");
         getLogger().info("Dams's Vanilla + Enabled.");
         getLogger().info("'To become a star, you must burn.'");

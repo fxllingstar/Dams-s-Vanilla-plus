@@ -1,4 +1,4 @@
-/*
+﻿/*
  * DVPlus (Dams's Vanilla +)
  * Copyright (C) 2026 fxllingstar
  *
@@ -31,22 +31,16 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockGrowEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import io.papermc.paper.event.entity.EntityMoveEvent;
-import org.bukkit.event.player.PlayerMoveEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 public class GcgAutomationListener implements Listener, CommandExecutor, TabCompleter {
-
-    private static final long DIAGNOSTIC_COOLDOWN_MILLIS = 500L;
 
     private final KineticGridListener gridManager;
     private final Map<Long, Long> sculkCooldowns = new HashMap<>();
     private final Map<Long, Boolean> sculkCache = new HashMap<>();
-    private final Map<UUID, Long> batteryViewerCooldowns = new HashMap<>();
-    private final Map<UUID, Boolean> batteryViewerEnabled = new HashMap<>();
 
     public GcgAutomationListener(KineticGridListener gridManager) {
         this.gridManager = gridManager;
@@ -68,17 +62,6 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
         if (event.getFrom() != null && event.getFrom().getChunk().equals(to.getChunk())) return;
 
         handleHostileMob(monster, to);
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    public void onPlayerMove(PlayerMoveEvent event) {
-        if (event.getFrom() == null || event.getTo() == null) return;
-        if (event.getFrom().getChunk().equals(event.getTo().getChunk())) return;
-
-        Player player = event.getPlayer();
-        if (!batteryViewerEnabled.getOrDefault(player.getUniqueId(), false)) return;
-
-        sendBatteryStatus(player, event.getTo().getChunk());
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -134,17 +117,6 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
         gridManager.modifyBattery(chunk, -0.5);
     }
 
-    private void sendBatteryStatus(Player player, Chunk chunk) {
-        long now = System.currentTimeMillis();
-        if (batteryViewerCooldowns.getOrDefault(player.getUniqueId(), 0L) > now) return;
-
-        double charge = gridManager.getGridBattery(chunk);
-        int mode = gridManager.getGridMode(chunk);
-        String modeName = getModeDisplayName(mode);
-        player.sendMessage(String.format("§8[§6Grid Monitor§8] §7Field Energy: §e%.1f%% §8| §7Mode: §b%s", charge, modeName));
-        batteryViewerCooldowns.put(player.getUniqueId(), now + DIAGNOSTIC_COOLDOWN_MILLIS);
-    }
-
     private boolean hasSculkSensorCached(Chunk chunk, long key) {
         long now = System.currentTimeMillis();
         if (sculkCooldowns.getOrDefault(key, 0L) > now) {
@@ -166,100 +138,178 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
         sculkCooldowns.put(key, now + 5000L);
         return found;
     }
-
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-        if (cmd.getName().equalsIgnoreCase("displaybattery")) {
-            if (!(sender instanceof Player player)) {
-                sender.sendMessage("§cThis command can only be used by players.");
-                return true;
-            }
-
-            UUID playerId = player.getUniqueId();
-            boolean enabled = !batteryViewerEnabled.getOrDefault(playerId, false);
-            batteryViewerEnabled.put(playerId, enabled);
-
-            if (enabled) {
-                player.sendMessage("§8[§6Grid Monitor§8] §7Battery viewer §aenabled§7.");
-            } else {
-                batteryViewerCooldowns.remove(playerId);
-                player.sendMessage("§8[§6Grid Monitor§8] §7Battery viewer §cdisabled§7.");
-            }
-            return true;
-        }
-
         if (!cmd.getName().equalsIgnoreCase("gcg")) return false;
 
         if (!(sender instanceof Player player)) {
-            sender.sendMessage("§cThis command can only be used by players.");
+            sender.sendMessage("\u00A7cThis command can only be used by players.");
             return true;
         }
 
         if (args.length == 0) {
-            sendGcgUsage(sender);
+            sender.sendMessage("\u00A7cUsage: /gcg mode <0-4>");
+            sender.sendMessage("\u00A7cUsage: /gcg transfer <fromChunkX> <fromChunkZ> <toChunkX> <toChunkZ> [amount]");
             return true;
         }
 
         if (args[0].equalsIgnoreCase("mode")) {
-            if (args.length < 2) {
-                sendGcgUsage(sender);
-                return true;
-            }
-
-            int mode;
-            try {
-                mode = Integer.parseInt(args[1]);
-            } catch (NumberFormatException e) {
-                sender.sendMessage("§cMode must be a number between 0 and 4.");
-                return true;
-            }
-
-            if (mode < 0 || mode > 4) {
-                sender.sendMessage("§cMode must be between 0 and 4.");
-                return true;
-            }
-
-            Chunk chunk = player.getLocation().getChunk();
-            gridManager.setGridMode(chunk, mode);
-            String modeName = getModeDisplayName(mode);
-            player.sendMessage(String.format("§8[§6GCG§8] §7Mode set to §b%s §7(§e%d§7)", modeName, mode));
-            return true;
+            return handleModeCommand(player, sender, args);
         }
 
         if (args[0].equalsIgnoreCase("transfer")) {
-            if (args.length < 3) {
-                sendGcgUsage(sender);
-                return true;
-            }
-
-            int fromChunkX;
-            int fromChunkZ;
-            try {
-                fromChunkX = Integer.parseInt(args[1]);
-                fromChunkZ = Integer.parseInt(args[2]);
-            } catch (NumberFormatException e) {
-                sender.sendMessage("§cChunk coordinates must be whole numbers.");
-                return true;
-            }
-
-            Chunk targetChunk = player.getLocation().getChunk();
-            Chunk sourceChunk = player.getWorld().getChunkAt(fromChunkX, fromChunkZ);
-            double moved = gridManager.transferBattery(sourceChunk, targetChunk);
-            if (moved <= 0.0) {
-                sender.sendMessage("§cNo battery was transferred. Make sure both chunks are connected by powered redstone/lightning rods.");
-                return true;
-            }
-
-            player.sendMessage(String.format(
-                    "§8[§6GCG§8] §7Transferred §e%.1f%% §7from chunk §b%d,%d §7to §b%d,%d§7.",
-                    moved, fromChunkX, fromChunkZ, targetChunk.getX(), targetChunk.getZ()));
-            return true;
+            return handleTransferCommand(player, sender, args);
         }
 
-        sendGcgUsage(sender);
+        sender.sendMessage("\u00A7cUnknown subcommand. Use /gcg mode or /gcg transfer.");
         return true;
     }
 
+    private boolean handleModeCommand(Player player, CommandSender sender, String[] args) {
+        if (args.length != 2) {
+            sender.sendMessage("\u00A7cUsage: /gcg mode <0-4>");
+            return true;
+        }
+
+        int mode;
+        try {
+            mode = Integer.parseInt(args[1]);
+        } catch (NumberFormatException e) {
+            sender.sendMessage("\u00A7cMode must be a number between 0 and 4.");
+            return true;
+        }
+
+        if (mode < 0 || mode > 4) {
+            sender.sendMessage("\u00A7cMode must be between 0 and 4.");
+            return true;
+        }
+
+        Chunk chunk = player.getLocation().getChunk();
+        gridManager.setGridMode(chunk, mode);
+        String modeName = getModeDisplayName(mode);
+        player.sendMessage(String.format("\u00A78[\u00A76GCG\u00A78] \u00A77Mode set to \u00A7b%s \u00A77(\u00A7e%d\u00A77)", modeName, mode));
+        return true;
+    }
+
+    private boolean handleTransferCommand(Player player, CommandSender sender, String[] args) {
+        if (args.length != 5 && args.length != 6) {
+            sender.sendMessage("\u00A7cUsage: /gcg transfer <fromChunkX> <fromChunkZ> <toChunkX> <toChunkZ> [amount]");
+            return true;
+        }
+
+        int fromX;
+        int fromZ;
+        int toX;
+        int toZ;
+        try {
+            fromX = Integer.parseInt(args[1]);
+            fromZ = Integer.parseInt(args[2]);
+            toX = Integer.parseInt(args[3]);
+            toZ = Integer.parseInt(args[4]);
+        } catch (NumberFormatException e) {
+            sender.sendMessage("\u00A7cChunk coordinates must be whole numbers.");
+            return true;
+        }
+
+        Chunk fromChunk = player.getWorld().getChunkAt(fromX, fromZ);
+        Chunk toChunk = player.getWorld().getChunkAt(toX, toZ);
+
+        if (gridManager.sharesBatterySource(fromChunk, toChunk)) {
+            sender.sendMessage("\u00A7cThose chunks already share the same power source.");
+            return true;
+        }
+
+        double sourceBattery = gridManager.getGridBattery(fromChunk);
+        if (sourceBattery <= 0.0) {
+            sender.sendMessage("\u00A7cThe source chunk has no electricity to transfer.");
+            return true;
+        }
+
+        double amount = sourceBattery;
+        if (args.length == 6) {
+            try {
+                amount = Double.parseDouble(args[5]);
+            } catch (NumberFormatException e) {
+                sender.sendMessage("\u00A7cAmount must be a positive number.");
+                return true;
+            }
+            if (amount <= 0.0) {
+                sender.sendMessage("\u00A7cAmount must be greater than 0.");
+                return true;
+            }
+        }
+
+        double moved = gridManager.transferBattery(fromChunk, toChunk, amount);
+        if (moved <= 0.0) {
+            sender.sendMessage("\u00A7cNo electricity was moved. The destination chunk may already be full.");
+            return true;
+        }
+
+        double fromRemaining = gridManager.getGridBattery(fromChunk);
+        double toNow = gridManager.getGridBattery(toChunk);
+        sender.sendMessage(String.format(
+                "\u00A78[\u00A76GCG\u00A78] \u00A7aTransferred \u00A7e%.1f%%\u00A7a power from \u00A7b(%d, %d)\u00A7a to \u00A7b(%d, %d)\u00A7a. \u00A77Source: \u00A7e%.1f%%\u00A77, Dest: \u00A7e%.1f%%",
+                moved, fromX, fromZ, toX, toZ, fromRemaining, toNow
+        ));
+        return true;
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!command.getName().equalsIgnoreCase("gcg")) {
+            return List.of();
+        }
+
+        if (args.length == 1) {
+            return filterSuggestions(args[0], List.of("mode", "transfer"));
+        }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("mode")) {
+            return filterSuggestions(args[1], List.of("0", "1", "2", "3", "4"));
+        }
+
+        if (args[0].equalsIgnoreCase("transfer")) {
+            if (sender instanceof Player player) {
+                int currentX = player.getLocation().getChunk().getX();
+                int currentZ = player.getLocation().getChunk().getZ();
+                List<String> suggestions = new ArrayList<>();
+
+                if (args.length == 2) {
+                    suggestions.add(String.valueOf(currentX));
+                    return filterSuggestions(args[1], suggestions);
+                }
+                if (args.length == 3) {
+                    suggestions.add(String.valueOf(currentZ));
+                    return filterSuggestions(args[2], suggestions);
+                }
+                if (args.length == 4) {
+                    suggestions.add(String.valueOf(currentX + 1));
+                    suggestions.add(String.valueOf(currentX - 1));
+                    suggestions.add(String.valueOf(currentX));
+                    return filterSuggestions(args[3], suggestions);
+                }
+                if (args.length == 5) {
+                    suggestions.add(String.valueOf(currentZ + 1));
+                    suggestions.add(String.valueOf(currentZ - 1));
+                    suggestions.add(String.valueOf(currentZ));
+                    return filterSuggestions(args[4], suggestions);
+                }
+            }
+        }
+
+        return List.of();
+    }
+
+    private List<String> filterSuggestions(String token, List<String> suggestions) {
+        if (token == null || token.isEmpty()) {
+            return suggestions;
+        }
+
+        String lowerToken = token.toLowerCase();
+        return suggestions.stream()
+                .filter(suggestion -> suggestion.toLowerCase().startsWith(lowerToken))
+                .toList();
+    }
     private String getModeDisplayName(int mode) {
         return switch (mode) {
             case 0 -> "ALL";
@@ -271,39 +321,7 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
         };
     }
 
-    @Override
-    public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
-        if (cmd.getName().equalsIgnoreCase("displaybattery")) {
-            return List.of();
-        }
-
-        if (!cmd.getName().equalsIgnoreCase("gcg")) {
-            return List.of();
-        }
-
-        List<String> suggestions = new ArrayList<>();
-        if (args.length == 1) {
-            String prefix = args[0].toLowerCase();
-            if ("mode".startsWith(prefix)) {
-                suggestions.add("mode");
-            }
-            if ("transfer".startsWith(prefix)) {
-                suggestions.add("transfer");
-            }
-            return suggestions;
-        }
-
-        if (args.length == 2 && args[0].equalsIgnoreCase("mode")) {
-            for (int i = 0; i <= 4; i++) {
-                String value = Integer.toString(i);
-                if (value.startsWith(args[1])) {
-                    suggestions.add(value);
-                }
-            }
-        }
-
-        return suggestions;
-    }
+    
 
     private void sendGcgUsage(CommandSender sender) {
         sender.sendMessage("§8[§6GCG§8] §7Usage:");
@@ -312,3 +330,4 @@ public class GcgAutomationListener implements Listener, CommandExecutor, TabComp
         sender.sendMessage("§8Run transfer in the chunk that should receive the battery.");
     }
 }
+

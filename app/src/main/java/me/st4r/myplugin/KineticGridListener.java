@@ -114,23 +114,38 @@ public class KineticGridListener implements Listener  {
         targetPdc.set(sourceBatteryKey, PersistentDataType.DOUBLE, clampBattery(current + delta));
     }
 
-    public double transferBattery(Chunk fromChunk, Chunk toChunk) {
-        if (fromChunk == null || toChunk == null) return 0.0;
-        if (!fromChunk.getWorld().equals(toChunk.getWorld())) return 0.0;
-        if (fromChunk.equals(toChunk)) return 0.0;
+    public double transferBattery(Chunk fromChunk, Chunk toChunk, double requestedAmount) {
+        if (requestedAmount <= 0.0) return 0.0;
+        if (sharesBatterySource(fromChunk, toChunk)) return 0.0;
 
-        if (!containsLightningRod(fromChunk) || !containsLightningRod(toChunk)) return 0.0;
-        if (!hasPoweredTransferSignal(toChunk)) return 0.0;
-        if (!hasTransferPath(fromChunk, toChunk)) return 0.0;
+        Chunk fromOwner = resolveBatteryOwnerChunk(fromChunk);
+        Chunk toOwner = resolveBatteryOwnerChunk(toChunk);
+        PersistentDataContainer fromPdc = fromOwner.getPersistentDataContainer();
+        PersistentDataContainer toPdc = toOwner.getPersistentDataContainer();
 
-        double sourceBattery = getGridBattery(fromChunk);
-        double targetBattery = getGridBattery(toChunk);
-        double transferable = Math.min(sourceBattery, MAX_BATTERY - targetBattery);
+        double fromCharge = clampBattery(fromPdc.getOrDefault(sourceBatteryKey, PersistentDataType.DOUBLE, 0.0));
+        if (fromCharge <= 0.0) return 0.0;
+
+        double toCharge = clampBattery(toPdc.getOrDefault(sourceBatteryKey, PersistentDataType.DOUBLE, 0.0));
+        double transferable = Math.min(requestedAmount, fromCharge);
+        transferable = Math.min(transferable, MAX_BATTERY - toCharge);
         if (transferable <= 0.0) return 0.0;
 
-        modifyBattery(fromChunk, -transferable);
-        modifyBattery(toChunk, transferable);
+        fromPdc.set(sourceBatteryKey, PersistentDataType.DOUBLE, clampBattery(fromCharge - transferable));
+        toPdc.set(sourceBatteryKey, PersistentDataType.DOUBLE, clampBattery(toCharge + transferable));
         return transferable;
+    }
+
+    public boolean sharesBatterySource(Chunk firstChunk, Chunk secondChunk) {
+        Chunk firstOwner = resolveBatteryOwnerChunk(firstChunk);
+        Chunk secondOwner = resolveBatteryOwnerChunk(secondChunk);
+        return firstOwner.getWorld().equals(secondOwner.getWorld())
+                && firstOwner.getX() == secondOwner.getX()
+                && firstOwner.getZ() == secondOwner.getZ();
+    }
+
+    private void chargeGridNetwork(Block startBlock, double chargeAmount) {
+        chargeChunkBattery(startBlock.getChunk(), chargeAmount);
     }
 
     private void sendChargeFeedback(Block strikeBlock, String source, Player directRecipient) {
@@ -160,6 +175,67 @@ public class KineticGridListener implements Listener  {
     private boolean containsLightningRod(Chunk chunk) {
         return containsMaterial(chunk, Material.LIGHTNING_ROD);
     }
+
+        private Chunk resolveBatteryOwnerChunk(Chunk currentChunk) {
+        if (currentChunk.getPersistentDataContainer().has(sourceBatteryKey, PersistentDataType.DOUBLE)) {
+            return currentChunk;
+        }
+
+        Chunk sourceChunk = resolveBatterySourceChunk(currentChunk);
+        if (sourceChunk == null) return currentChunk;
+        return sourceChunk;
+    }
+
+    private Chunk resolveBatterySourceChunk(Chunk chunk) {
+        Queue<Chunk> queue = new ArrayDeque<>();
+        Set<Long> visited = new HashSet<>();
+        queue.add(chunk);
+        visited.add(getChunkKey(chunk));
+
+        while (!queue.isEmpty()) {
+            Chunk current = queue.poll();
+            if (current.getPersistentDataContainer().has(sourceBatteryKey, PersistentDataType.DOUBLE)) {
+                return current;
+            }
+
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dz == 0) continue;
+                    Chunk neighbor = current.getWorld().getChunkAt(current.getX() + dx, current.getZ() + dz);
+                    long key = getChunkKey(neighbor);
+                    if (!visited.add(key)) continue;
+
+                    if (areChunksConnected(current, neighbor)) {
+                        queue.add(neighbor);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean areChunksConnected(Chunk from, Chunk to) {
+        int fromX = from.getX();
+        int fromZ = from.getZ();
+        int toX = to.getX();
+        int toZ = to.getZ();
+
+        if (Math.abs(fromX - toX) <= 1 && Math.abs(fromZ - toZ) <= 1) {
+            for (int y = from.getWorld().getMinHeight(); y < from.getWorld().getMaxHeight(); y++) {
+                Block fromBlock = from.getBlock(15, y, 15);
+                Block toBlock = to.getBlock(0, y, 0);
+                if (isTransferMaterial(fromBlock.getType()) && isTransferMaterial(toBlock.getType())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private PersistentDataContainer resolveBatteryContainer(Chunk currentChunk) {
+        return resolveBatteryOwnerChunk(currentChunk).getPersistentDataContainer();
+    }
+
 
     private boolean hasPoweredTransferSignal(Chunk chunk) {
         for (int x = 0; x < 16; x++) {

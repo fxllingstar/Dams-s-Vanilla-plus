@@ -502,8 +502,10 @@ private void triggerPulse(Player player) {
                 || highlightedBlocks.contains(packBlockPos(x, y - 1, z))
                 || highlightedBlocks.contains(packBlockPos(x, y, z + 1))
                 || highlightedBlocks.contains(packBlockPos(x, y, z - 1));
-        if (DEBUG_VERBOSE && adjacent) {
-            debug("Adjacent highlight detected at " + x + "," + y + "," + z);
+        if (DEBUG_VERBOSE) {
+            if (adjacent) {
+                debug("Adjacent highlight detected at " + x + "," + y + "," + z);
+            }
         }
         return adjacent;
     }

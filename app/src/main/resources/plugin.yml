@@ -9,8 +9,8 @@ commands:
     description: Control your messenger parrot
     usage: /parrot deliver <PlayerName>
   gcg:
-    description: Control the GCG automation grid mode
-    usage: /gcg <mode|transfer>
-  displaybattery:
-    description: Toggle live battery readouts when you change chunks
-    usage: /displaybattery
+    description: Control GCG chunk mode and electricity transfer
+    usage: /gcg mode <0-4> or /gcg transfer <fromX> <fromZ> <toX> <toZ> [amount]
+  batterydisplay:
+    description: Toggle chunk battery display when moving between chunks
+    usage: /batterydisplay
