@@ -17,7 +17,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
-import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Piston;
 import org.bukkit.block.data.type.PistonHead;
 import org.bukkit.entity.Player;
@@ -41,21 +40,12 @@ import java.util.UUID;
 public class KineticTrampolineListener implements Listener {
 
     private static final BlockFace[] PISTON_FACES = {
-            BlockFace.UP,
-            BlockFace.NORTH,
-            BlockFace.SOUTH,
-            BlockFace.EAST,
-            BlockFace.WEST
+            BlockFace.UP, BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
     };
     private static final BlockFace[] CONNECTED_SLIME_FACES = {
-            BlockFace.UP,
-            BlockFace.DOWN,
-            BlockFace.NORTH,
-            BlockFace.SOUTH,
-            BlockFace.EAST,
-            BlockFace.WEST
+            BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
     };
-
+ 
     private static final double MIN_HORIZONTAL_SPEED_SQUARED = 0.01D;
     private static final double SIDEWAYS_SPEED_MULTIPLIER = 1.8D;
     private static final double SIDEWAYS_VERTICAL_BASE = 0.35D;
@@ -66,17 +56,18 @@ public class KineticTrampolineListener implements Listener {
     private static final double MAX_VERTICAL_BOOST = 2.4D;
     private static final long FALL_PROTECTION_MILLIS = 15_000L; 
     private static final long LAUNCH_COOLDOWN_MILLIS = 400L;
-    private static final int MAX_COPPER_MULTIPLIER = 3;
     private static final int MAX_CONNECTED_SLIMES = 9; 
-    private static final boolean DEBUG = false;
 
     private final NamespacedKey trampolineBoostKey;
     private final Map<UUID, Long> launchCooldowns = new HashMap<>();
     private final Map<UUID, Block> lastCheckedBlock = new HashMap<>();
+    private final KineticGridListener gridManager;
 
-    public KineticTrampolineListener(DVPlus plugin) {
-        this.trampolineBoostKey = new NamespacedKey(plugin, "trampoline_boost_until");
-    }
+   
+   public KineticTrampolineListener(DVPlus plugin, KineticGridListener gridManager) {
+    this.trampolineBoostKey = new NamespacedKey(plugin, "trampoline_boost_until");
+    this.gridManager = gridManager; // Use the shared instance
+}
 
     @EventHandler(ignoreCancelled = true)
     public void onPlayerMove(PlayerMoveEvent event) {
@@ -87,60 +78,52 @@ public class KineticTrampolineListener implements Listener {
         UUID playerId = player.getUniqueId();
         
         Block previousBlock = lastCheckedBlock.put(playerId, currentBlock);
-        if (previousBlock != null && previousBlock.equals(currentBlock)) {
-            return;
-        }
+        if (previousBlock != null && previousBlock.equals(currentBlock)) return;
 
-        // Check the block directly under the player's feet (allows jump/fall triggers)
         Block supportBlock = currentBlock.getRelative(BlockFace.DOWN);
         if (supportBlock.getType() != Material.SLIME_BLOCK) return;
 
         TrampolineStructure structure = findTrampolineStructure(supportBlock);
-        if (structure == null) {
-            debug(player, "Skipped: no valid kinetic structure found");
-            return;
-        }
+        if (structure == null) return;
 
-        // Calculate velocity delta from player movement vectors (Fixes sprinting/jumping mechanics)
         double dx = event.getTo().getX() - event.getFrom().getX();
         double dz = event.getTo().getZ() - event.getFrom().getZ();
         Vector horizontalVelocity = new Vector(dx, 0, dz);
         double horizontalSpeedSquared = horizontalVelocity.lengthSquared();
 
-        if (horizontalSpeedSquared < MIN_HORIZONTAL_SPEED_SQUARED) {
-            debug(player, "Skipped: speed below threshold " + MIN_HORIZONTAL_SPEED_SQUARED);
-            return;
-        }
+        if (horizontalSpeedSquared < MIN_HORIZONTAL_SPEED_SQUARED) return;
 
         long now = System.currentTimeMillis();
-        long cooldownUntil = launchCooldowns.getOrDefault(playerId, 0L);
-        if (cooldownUntil > now) return;
+        if (launchCooldowns.getOrDefault(playerId, 0L) > now) return;
+
+      
+        if (structure.copperMultiplier() == 4) {
+            gridManager.modifyBattery(supportBlock.getChunk(), -5.0);
+        }
 
         launchCooldowns.put(playerId, now + LAUNCH_COOLDOWN_MILLIS);
         launchPlayer(player, structure, horizontalVelocity, Math.sqrt(horizontalSpeedSquared), now);
         player.getWorld().playSound(player.getLocation(), Sound.BLOCK_PISTON_EXTEND, 0.9F, 1.05F);
-        debug(player, "Launch triggered! Slimes: " + structure.connectedSlimes() + ", Power: " + structure.copperMultiplier());
     }
 
-   @EventHandler(ignoreCancelled = true)
-public void onFallDamage(EntityDamageEvent event) {
-    if (event.getCause() != EntityDamageEvent.DamageCause.FALL) return;
-    if (!(event.getEntity() instanceof Player player)) return;
+    @EventHandler(ignoreCancelled = true)
+    public void onFallDamage(EntityDamageEvent event) {
+        if (event.getCause() != EntityDamageEvent.DamageCause.FALL) return;
+        if (!(event.getEntity() instanceof Player player)) return;
 
-    PersistentDataContainer data = player.getPersistentDataContainer();
-    long protectionUntil = data.getOrDefault(trampolineBoostKey, PersistentDataType.LONG, 0L);
-    if (protectionUntil == 0L) return;
+        PersistentDataContainer data = player.getPersistentDataContainer();
+        long protectionUntil = data.getOrDefault(trampolineBoostKey, PersistentDataType.LONG, 0L);
+        if (protectionUntil == 0L) return;
 
-    if (System.currentTimeMillis() > protectionUntil) {
-        data.remove(trampolineBoostKey);
-        return;
+        if (System.currentTimeMillis() > protectionUntil) {
+            data.remove(trampolineBoostKey);
+            return;
+        }
+
+        event.setCancelled(true);
+        player.setFallDistance(0.0F);
+        data.remove(trampolineBoostKey); 
     }
-
-    event.setCancelled(true);
-    player.setFallDistance(0.0F);
-    data.remove(trampolineBoostKey); 
-    debug(player, "Fall damage protected and metadata cleared.");
-}
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
@@ -152,7 +135,7 @@ public void onFallDamage(EntityDamageEvent event) {
     private void launchPlayer(Player player, TrampolineStructure structure, Vector horizontalVelocity, double speed, long launchTime) {
         BlockFace direction = structure.pistonFacing();
         int powerMultiplier = structure.copperMultiplier();
-        Vector boostedVelocity = new Vector(); // Reset vector cleanly for dependable calculations
+        Vector boostedVelocity = new Vector();
 
         if (direction == BlockFace.UP) {
             double forwardMultiplier = UPWARD_FORWARD_MULTIPLIER * powerMultiplier;
@@ -175,12 +158,10 @@ public void onFallDamage(EntityDamageEvent event) {
 
         player.setFallDistance(0.0F);
         player.setVelocity(boostedVelocity);
-        long protectionUntil = launchTime + FALL_PROTECTION_MILLIS;
-        player.getPersistentDataContainer().set(trampolineBoostKey, PersistentDataType.LONG, protectionUntil);
+        player.getPersistentDataContainer().set(trampolineBoostKey, PersistentDataType.LONG, launchTime + FALL_PROTECTION_MILLIS);
     }
 
     private TrampolineStructure findTrampolineStructure(Block targetSlime) {
-        // 1. Map out every connected slime block in this pad using BFS
         Set<Block> slimeCluster = new HashSet<>();
         Queue<Block> queue = new ArrayDeque<>();
 
@@ -201,24 +182,26 @@ public void onFallDamage(EntityDamageEvent event) {
             if (slimeCluster.size() >= MAX_CONNECTED_SLIMES) break;
         }
 
-        // 2. Scan around the cluster to find if ANY block is driven by an extended sticky piston
         for (Block slimeBlock : slimeCluster) {
             for (BlockFace pistonFacing : PISTON_FACES) {
                 BlockFace toPiston = pistonFacing.getOppositeFace();
-                Block pistonHead = slimeBlock.getRelative(toPiston);
+                Block targetBlock = slimeBlock.getRelative(toPiston);
 
-                if (isMatchingPistonHead(pistonHead, pistonFacing)) {
-                    Block pistonBase = pistonHead.getRelative(toPiston);
+                // Extended configuration pathway match check
+                if (isMatchingPistonHead(targetBlock, pistonFacing)) {
+                    Block pistonBase = targetBlock.getRelative(toPiston);
                     if (pistonBase.getType() == Material.STICKY_PISTON) {
-                        BlockData blockData = pistonBase.getBlockData();
-                        if (blockData instanceof Piston piston && piston.isExtended() && piston.getFacing() == pistonFacing) {
-                            
-                            // 3. Piston located successfully! Check for backing copper power blocks
+                        if (pistonBase.getBlockData() instanceof Piston piston && piston.isExtended()) {
                             int copperMultiplier = countCopperBlocks(pistonBase, toPiston);
-                            if (copperMultiplier > 0) {
-                                return new TrampolineStructure(pistonFacing, copperMultiplier, slimeCluster.size());
-                            }
+                            if (copperMultiplier > 0) return new TrampolineStructure(pistonFacing, copperMultiplier, slimeCluster.size());
                         }
+                    }
+                } 
+                // Unextended block structure fallback check to match unextended pistons flush with slime
+                else if (targetBlock.getType() == Material.STICKY_PISTON) {
+                    if (targetBlock.getBlockData() instanceof Piston piston && !piston.isExtended() && piston.getFacing() == pistonFacing) {
+                        int copperMultiplier = countCopperBlocks(targetBlock, toPiston);
+                        if (copperMultiplier > 0) return new TrampolineStructure(pistonFacing, copperMultiplier, slimeCluster.size());
                     }
                 }
             }
@@ -228,28 +211,23 @@ public void onFallDamage(EntityDamageEvent event) {
 
     private int countCopperBlocks(Block pistonBase, BlockFace copperDirection) {
         int copperBlocks = 0;
-        for (int distance = 1; distance <= MAX_COPPER_MULTIPLIER; distance++) {
-            if (pistonBase.getRelative(copperDirection, distance).getType() != Material.COPPER_BLOCK) break;
+        org.bukkit.Chunk chunk = pistonBase.getChunk();
+        
+        boolean isGalvanized = gridManager.getGridBattery(chunk) > 5.0;
+        int maxCap = isGalvanized ? 4 : 3;
+
+        for (int distance = 1; distance <= maxCap; distance++) {
+            Block candidate = pistonBase.getRelative(copperDirection, distance);
+            // Matches all copper types and variants registered inside the grid network
+            if (!gridManager.isConductiveMaterial(candidate.getType())) break;
             copperBlocks++;
         }
         return copperBlocks;
     }
 
     private boolean isMatchingPistonHead(Block block, BlockFace pistonFacing) {
-        if (block.getType() != Material.PISTON_HEAD) return false;
-        BlockData blockData = block.getBlockData();
-        return blockData instanceof PistonHead head && head.getFacing() == pistonFacing;
+        return block.getType() == Material.PISTON_HEAD && block.getBlockData() instanceof PistonHead head && head.getFacing() == pistonFacing;
     }
 
-    private boolean isSolidLanding(Player player) {
-        return player.getLocation().getBlock().getRelative(BlockFace.DOWN).getType().isSolid();
-    }
-
-    private void debug(Player player, String message) {
-        if (!DEBUG) return;
-        player.sendMessage("§8[§bKTramp Debug§8] §7" + message);
-    }
-
-    private record TrampolineStructure(BlockFace pistonFacing, int copperMultiplier, int connectedSlimes) {
-    }
+    private record TrampolineStructure(BlockFace pistonFacing, int copperMultiplier, int connectedSlimes) {}
 }
