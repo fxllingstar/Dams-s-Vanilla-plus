@@ -1,4 +1,4 @@
-# Dams's Vanilla+ `DVPlus`
+#  Vanilla+ `DVPlus`
 
 DVPlus is a Paper plugin that expands vanilla Minecraft with survival-friendly mechanics, atmospheric systems, and a few utility upgrades that fit the base game rather than replacing it.
 
